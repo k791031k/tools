@@ -151,11 +151,21 @@
             document.getElementById('cqb-dispatch-btn').addEventListener('click', () => eventHandlers.handleConfirmDispatch());
             state.set({ isBusy: false });
         },
-        createTokenDialog() { /* ... (與前版相同) ... */ },
-        createBaseUI(title) { /* ... (與前版相同) ... */ },
-        showToast(message, type, duration) { /* ... (與前版相同) ... */ },
+        createTokenDialog() {
+            if (state.isBusy) return;
+            state.set({ isBusy: true });
+            const uiContainer = this.createBaseUI('手動輸入 Token');
+            if (!uiContainer) { state.set({ isBusy: false }); return; }
+            uiContainer.querySelector('.cqb-modal-body').innerHTML = `<p class="cqb-p">在支援的網站上，但未自動找到 Token。</p><p class="cqb-p">請手動貼上您的 SSO-TOKEN：</p><div class="cqb-form-group"><textarea id="cqb-token-input" class="cqb-input cqb-textarea" rows="4" placeholder="請在此處貼上 Token..."></textarea></div>`;
+            uiContainer.querySelector('.cqb-modal-footer').innerHTML = `<div class="cqb-footer-left"></div><div class="cqb-footer-right"><button id="cqb-save-token-btn" class="cqb-btn cqb-btn-primary">儲存並開始</button></div>`;
+            document.body.appendChild(uiContainer);
+            document.getElementById('cqb-save-token-btn').addEventListener('click', () => eventHandlers.handleSaveTokenClick());
+            state.set({ isBusy: false });
+        },
+        createBaseUI(title) { this.destroy(); this.injectCSS(); const container = document.createElement('div'); container.id = config.uiId; container.innerHTML = `<div class="cqb-modal-backdrop"></div><div class="cqb-modal-content"><div class="cqb-modal-header"><h2>${title}</h2><button id="cqb-close-btn" class="cqb-close-btn">&times;</button></div><div class="cqb-modal-body"></div><div class="cqb-modal-footer"></div></div>`; const closeBtn = container.querySelector('.cqb-close-btn'); if (closeBtn) closeBtn.addEventListener('click', () => this.destroy()); return container; },
+        showToast(message, type = 'info', duration = 3000) { const toastId = `${config.uiId}-toast`; const oldToast = document.getElementById(toastId); if (oldToast) oldToast.remove(); const toast = document.createElement('div'); toast.id = toastId; toast.className = `cqb-toast cqb-toast-${type}`; toast.textContent = message; document.body.appendChild(toast); setTimeout(() => toast.remove(), duration); },
         destroy() { const uiElement = document.getElementById(config.uiId); if (uiElement) uiElement.remove(); state.set({ isBusy: false }); },
-        injectCSS() { /* ... (與前版相同) ... */ }
+        injectCSS() { const styleId = `${config.uiId}-style`; if (document.getElementById(styleId)) return; const style = document.createElement('style'); style.id = styleId; style.textContent = `:root{--cqb-primary:#007bff;--cqb-secondary:#6c757d;--cqb-light:#f8f9fa;--cqb-dark:#343a40}#${config.uiId}{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}#${config.uiId} .cqb-modal-backdrop{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.6);z-index:2147483645}#${config.uiId} .cqb-modal-content{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background-color:var(--cqb-light);border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:2147483646;width:800px;max-width:95%;display:flex;flex-direction:column;max-height:90vh}#${config.uiId} .cqb-modal-header{padding:16px 24px;border-bottom:1px solid #dee2e6;background-color:#fff;position:relative}#${config.uiId} .cqb-modal-header h2{margin:0;font-size:1.25rem;font-weight:600;color:var(--cqb-dark)}#${config.uiId} .cqb-close-btn{background:none;border:none;font-size:1.75rem;cursor:pointer;color:#888;position:absolute;top:50%;right:24px;transform:translateY(-50%)}#${config.uiId} .cqb-modal-body{padding:24px;overflow-y:auto;background-color:#fff}#${config.uiId} .cqb-warning-banner,#${config.uiId} .cqb-summary-box{background-color:#e2f3f5;border:1px solid #b6e0e6;color:#317281;padding:1rem;margin-bottom:1.5rem;border-radius:.25rem}#${config.uiId} .cqb-table-container{max-height:60vh;overflow-y:auto;border:1px solid #dee2e6;border-radius:.25rem}#${config.uiId} .cqb-table{width:100%;border-collapse:collapse}#${config.uiId} .cqb-table th,#${config.uiId} .cqb-table td{padding:12px 15px;text-align:left;border-bottom:1px solid #dee2e6;vertical-align:middle}#${config.uiId} .cqb-table thead th{background-color:#f8f9fa;position:sticky;top:0;z-index:1}#${config.uiId} .cqb-table tbody tr:hover{background-color:#f1f3f5}#${config.uiId} #cqb-selection-summary{margin-top:1rem;font-weight:500;color:var(--cqb-dark)}#${config.uiId} .cqb-input,#${config.uiId} .cqb-textarea{display:block;width:100%;padding:.5rem .75rem;font-size:1rem;border:1px solid #ced4da;border-radius:.25rem;box-sizing:border-box}#${config.uiId} .cqb-modal-footer{padding:16px 24px;border-top:1px solid #dee2e6;display:flex;justify-content:space-between;gap:12px;background-color:var(--cqb-light);align-items:center}#${config.uiId} .cqb-footer-left,#${config.uiId} .cqb-footer-right{display:flex;gap:12px}#${config.uiId} .cqb-btn{font-weight:400;cursor:pointer;border:1px solid transparent;padding:.5rem 1rem;font-size:1rem;border-radius:.25rem;transition:background-color .2s,border-color .2s}#${config.uiId} .cqb-btn:disabled{opacity:.65;cursor:not-allowed}#${config.uiId} .cqb-btn-primary{color:#fff;background-color:var(--cqb-primary);border-color:var(--cqb-primary)}#${config.uiId} .cqb-btn-primary:not(:disabled):hover{background-color:#0069d9;border-color:#0062cc}#${config.uiId} .cqb-btn-secondary{color:#212529;background-color:transparent;border:1px solid #ccc}#${config.uiId} .cqb-btn-secondary:not(:disabled):hover{background-color:#e2e6ea}#${config.uiId} .cqb-filter-container{margin-bottom:1rem;display:flex;align-items:center;flex-wrap:wrap;gap:10px}#${config.uiId} .cqb-filter-container label{font-weight:500;margin-right:5px;font-size:.9rem}#${config.uiId} .cqb-btn-filter{background-color:#e9ecef;border-color:#ced4da;color:var(--cqb-dark);padding:.25rem .75rem;font-size:.9rem}#${config.uiId} .cqb-btn-filter:hover{background-color:#dee2e6}#${config.uiId} .cqb-btn-filter-clear{background-color:var(--cqb-secondary);color:white}#${config.uiId} .cqb-hr{border:0;border-top:1px solid #dee2e6;margin:0 0 1.5rem 0}#${config.uiId} .cqb-launcher-buttons{display:flex;gap:15px;justify-content:center;padding:2rem 0}#${config.uiId} .cqb-launcher-buttons .cqb-btn{padding:1rem 2rem;font-size:1.2rem}#${config.uiId} .cqb-grid-form{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.cqb-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:6px;color:#fff;font-size:1rem;z-index:2147483647;box-shadow:0 3px 15px rgba(0,0,0,.2);opacity:0;transition:opacity .3s,top .3s;animation:cqb-toast-in .5s forwards}@keyframes cqb-toast-in{from{opacity:0;top:0}to{opacity:1;top:20px}}`; document.head.appendChild(style); }
     };
 
     // ===================================================================================
@@ -168,6 +178,7 @@
             do {
                 const payload = { nowPage: currentPage, pageSize: pageSize, orderBy: "assignId", ascOrDesc: "desc" };
                 const result = await this._fetch(config.apiEndpoints.queryPersonalCases, payload);
+                if (currentPage === 1) { console.log("黑盒子日誌 (個人案件 API 原始回應 - 第一頁):", result); }
                 if (result && result.records) {
                     allCases = allCases.concat(result.records);
                     if (currentPage === 1 && result.total) { totalPages = Math.ceil(result.total / pageSize); }
@@ -190,9 +201,6 @@
             uiManager.showToast('正在抓取所有個人案件資料...', 'info');
             try {
                 const cases = await apiHandler.fetchPersonalCases();
-                console.group("黑盒子日誌 - 個人案件查詢");
-                console.log("1. API 原始回應 (Raw Response):", cases); // 這裡的 cases 已經是合併後的完整陣列
-                console.groupEnd();
                 state.set({ currentCases: cases, selectedCases: [] });
                 uiManager.createCaseListDialog(cases, 'personal');
             } catch (error) { uiManager.showToast(`抓取案件失敗: ${error.message}`, 'error'); }
@@ -212,7 +220,7 @@
                 const result = await apiHandler.findPublicProposals(params);
                 console.group("黑盒子日誌 - 公池案件查詢");
                 console.log("1. API 原始回應 (Raw Response):", result);
-                const cases = Array.isArray(result) ? result : result.data || result.records || (typeof result === 'object' && result !== null ? Object.values(result).find(Array.isArray) : []) || [];
+                const cases = Array.isArray(result) ? result : result.records || result.data || (typeof result === 'object' && result !== null ? Object.values(result).find(Array.isArray) : []) || [];
                 console.log("2. 智慧搜查提取出的案件陣列:", cases);
                 console.groupEnd();
                 state.set({ currentCases: cases, selectedCases: [] });
