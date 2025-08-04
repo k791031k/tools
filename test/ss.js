@@ -3,11 +3,11 @@ javascript:(function() {
 
     /**
      * =================================================================================
-     * 書籤小工具 - 多功能派件整合版 v9.2.0 (穩定版)
+     * 書籤小工具 - 多功能派件整合版 v9.2.1 (錯誤修正版)
      * =================================================================================
-     * 概述：
-     * 本版本為功能完整的穩定版，整合了所有已確認的客製化需求，並移除了
-     * 實驗性的程式碼架構，確保最佳的穩定性與可執行性。
+     * v9.2.1 更新日誌:
+     * - 緊急修復：修正了因模組化後，主流程 (Main) 呼叫 UI 元件 (UIComponents)
+     * 時未加前綴，導致 'is not defined' 的嚴重錯誤。
      * =================================================================================
      */
 
@@ -15,11 +15,11 @@ javascript:(function() {
      * @module Config
      */
     const Config = Object.freeze({
-        VERSION: '9.2.0-stable',
+        VERSION: '9.2.1-hotfix',
         TOOL_ID: 'pct-multifunction-tool-container-v92',
         STYLE_ID: 'pct-multifunction-tool-styles-v92',
         TOKEN_STORAGE_KEY: 'euisToken',
-        PRESETS_STORAGE_KEY: 'pctToolPresets_v2',
+        PRESETS_STORAGE_KEY: 'pctToolPresets_v3',
         API_ENDPOINTS: {
             queryPersonalCases: 'https://euisv-uat.apps.tocp4.kgilife.com.tw/euisw/euisb/api/assign/queryPersonalCaseFromPool',
             findProposalDispatch: 'https://euisv-uat.apps.tocp4.kgilife.com.tw/euisw/euisb/api/assign/findProposalDispatch',
@@ -28,8 +28,9 @@ javascript:(function() {
         DEFAULT_PERSONNEL_PERSONAL: [ 'chenjui.chang', 'carol.chan', 'pearl.ho', 'jessy.fu', 'alex.yc.liu', 'cheryl0319.liu', 'lisa.wu', 'vita.wu', 'nancy.wu', 'peiyi.wu' ].sort(),
         DEFAULT_PERSONNEL_BATCH: [ 'chenjui.chang', 'carol.chan', 'pearl.ho', 'jessy.fu', 'alex.yc.liu', 'cheryl0319.liu', 'lisa.wu', 'vita.wu', 'nancy.wu', 'peiyi.wu' ].sort(),
         SPECIAL_PERSONNEL: ['chenjui.chang', 'peiyi.wu'],
-        DEFAULT_PERSONAL_PAYLOAD: { applyNumber: "", policyNumber: "", mainStatus: "", subStatus: "", hint: "", ownerName: "", insuredName: "", firstBillingMethod: "", planCodeName: "", planCode: "", applyDateStart: "", applyDateEnd: "", agencyCodeName: "", replyEstimatedCompletionDateStart: "", replyEstimatedCompletionDateEnd: "", channel: "", caseLabelings: [], productLabelings: [], pageIndex: 1, size: 50, orderBys: [] },
-        DEFAULT_BATCH_PAYLOAD: { applyNumber: "", policyNumber: "", org: "", poolOrg: "", uwLevels: [], poolUwLevels: [], caseLabelings: [], productLabelings: [], polpln: "", mainStatus: "2", subStatus: "", channel: "", agencyCode: "", uwApprover: null, currentOwner: null, firstBillingMethod: "", hint: "", ownerTaxId: "", ownerName: "", insuredTaxId: "", insuredName: "", applyDateStart: "", applyDateEnd: "", confrmno: "", currency: "", firstPaymentPremiumFlag: "", pageIndex: 1, size: 50, orderBys: ["applyNumber asc"] },
+        DEFAULT_PERSONAL_PAYLOAD: { applyNumber: "", policyNumber: "", mainStatus: "", subStatus: "", hint: "", ownerName: "", insuredName: "", firstBillingMethod: "", planCodeName: "", planCode: "", applyDateStart: "", applyDateEnd: "", agencyCodeName: "", replyEstimatedCompletionDateStart: "", replyEstimatedCompletionDateEnd: "", channel: "", caseLabelings: [], productLabelings: [] },
+        DEFAULT_BATCH_PAYLOAD: { applyNumber: "", policyNumber: "", org: "", poolOrg: "", uwLevels: [], poolUwLevels: [], caseLabelings: [], productLabelings: [], polpln: "", mainStatus: "2", subStatus: "", channel: "", agencyCode: "", uwApprover: null, currentOwner: null, firstBillingMethod: "", hint: "", ownerTaxId: "", ownerName: "", insuredTaxId: "", insuredName: "", applyDateStart: "", applyDateEnd: "", confrmno: "", currency: "", firstPaymentPremiumFlag: "" },
+        NON_EDITABLE_PRESETS: ["pageIndex", "size", "orderBys"],
         BATCH_CONFIG: { pageSize: 50 },
         ZINDEX: { NOTIFY: 2147483647, OVERLAY: 2147483640, MAIN_MODAL: 2147483641 }
     });
@@ -38,11 +39,11 @@ javascript:(function() {
      * @module GlobalState
      */
     const GlobalState = (() => {
-        const state = { token: null, modalPosition: { top: null, left: null }, allPersonalCases: [], allBatchCases: [], abortController: null };
+        const state = { token: null, modalPosition: { top: null, left: null }, allPersonalCases: [], allBatchCases: [], abortController: null, viewState: {} };
         return {
             get: (key) => key ? state[key] : { ...state },
             set: (k, v) => { if (typeof k === 'object') { Object.assign(state, k); } else { state[k] = v; } },
-            clearSessionState: () => { state.allPersonalCases = []; state.allBatchCases = []; },
+            clearSessionState: () => { state.allPersonalCases = []; state.allBatchCases = []; state.viewState = {}; },
             createAbortController: () => { state.abortController = new AbortController(); return state.abortController.signal; },
             abortCurrentRequest: () => { state.abortController?.abort(); state.abortController = null; }
         };
@@ -63,7 +64,8 @@ javascript:(function() {
             formatDateForDisplay: (dateString) => (dateString && typeof dateString === 'string') ? dateString.split(' ')[0] : '',
             formatDateForApi: (date) => { if (!date) return ""; const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d} 00:00:00`; },
             getTodayDate: () => new Date(),
-            getDateBefore: (date, days) => new Date(date.getTime() - (days * 24 * 60 * 60 * 1000))
+            getDateBefore: (date, days) => new Date(date.getTime() - (days * 24 * 60 * 60 * 1000)),
+            debounce: (func, delay) => { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); }; }
         };
     })();
 
@@ -99,18 +101,21 @@ javascript:(function() {
                 .pct-progress-overlay button { margin-top: 20px; }
                 .pct-filter-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; background-color: #f9f9f9; }
                 .pct-filter-form div { display: flex; flex-direction: column; } .pct-filter-form label { font-size: 13px; margin-bottom: 2px; }
-                .pct-table-container { overflow: auto; max-height: calc(85vh - 350px); }
+                .pct-table-container { overflow: auto; max-height: calc(85vh - 350px); position: relative; }
+                .pct-table-scroll-content { position: absolute; top: 0; left: 0; width: 100%; }
                 .pct-table { width: 100%; border-collapse: collapse; font-size: 12px; }
                 .pct-table th, .pct-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
                 .pct-table th { background-color: #f8f9fa; position: sticky; top: -1px; z-index: 1; }
                 .pct-table td { cursor: cell; }
                 .pct-table th.sortable { cursor: pointer; user-select: none; } .pct-table th.sortable:hover { background-color: #e9ecef; }
                 .pct-table th .sort-arrow { display: inline-block; width: 1em; text-align: center; }
-                .pct-table tbody tr.filtered-out { display: none; }
                 .pct-view-toggle { margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
                 .pct-view-toggle button { background: #f0f0f0; border: 1px solid #ccc; padding: 8px 15px; cursor: pointer; font-size:14px; }
                 .pct-view-toggle button.active { background: #fff; border-bottom-color: #fff; font-weight: bold; color: var(--primary-color); }
                 .pct-view-pane { display: none; } .pct-view-pane.active { display: block; }
+                fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-top: 15px; }
+                legend { font-weight: bold; padding: 0 10px; }
+                .pct-help-btn { position: absolute; top: 15px; left: 15px; font-size: 18px; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #f0f0f0; color: #555; border: 1px solid #ccc; }
             `;
             document.head.appendChild(style);
         }
@@ -131,8 +136,9 @@ javascript:(function() {
                     modal.innerHTML = `<div class="pct-modal-header">${opts.header}<button class="pct-modal-close-btn">&times;</button></div><div class="pct-modal-body">${opts.body}</div><div class="pct-modal-footer">${opts.footer}</div>`;
                     if (top && left) { modal.style.top = top; modal.style.left = left; modal.style.transform = 'none'; }
                     document.body.appendChild(modal); requestAnimationFrame(() => modal.classList.add('show-init'));
+                    const closeAndResolve = (action) => { this.close(); resolve({ action }); };
                     modal.querySelector('.pct-modal-header').addEventListener('mousedown', EventHandlers.dragMouseDown);
-                    modal.querySelector('.pct-modal-close-btn').addEventListener('click', () => { this.close(); resolve({ action: '_close_tool_' }); });
+                    modal.querySelector('.pct-modal-close-btn').addEventListener('click', () => closeAndResolve('_close_tool_'));
                     EventHandlers.setupGlobalKeyListener();
                     if (opts.onOpen) opts.onOpen(modal, resolve);
                 });
@@ -169,38 +175,48 @@ javascript:(function() {
         const BATCH_FILTER_FIELDS = [ {n:'applyNumber',l:'受理號碼'},{n:'policyNumber',l:'保單號碼'},{n:'ownerName',l:'要保人姓名'},{n:'ownerTaxId',l:'要保人ID'},{n:'insuredName',l:'被保人姓名'},{n:'insuredTaxId',l:'被保人ID'},{n:'mainStatus',l:'主狀態'},{n:'poolOrg',l:'POOL ORG'},{n:'polpln',l:'險種代碼'},{n:'channel',l:'業務來源'},{n:'applyDateStart',l:'要保日(起)',t:'date'},{n:'applyDateEnd',l:'要保日(迄)',t:'date'} ];
 
         function createCaseListView(options) {
-            const { header, allCases, filterFields, displayHeaders, exportHeaders, defaultFilterFn } = options;
+            const { header, allCases, filterFields, displayHeaders, exportHeaders, defaultFilterFn, onBack } = options;
             return UI.Modal.show({
                 header, width: '95vw',
-                body: `<div class="pct-view-toggle"><button class="pct-view-btn active" data-view="query">查詢案件</button><button class="pct-view-btn" data-view="manual">手動輸入</button></div><div id="query-pane" class="pct-view-pane active"><div class="pct-filter-form">${filterFields.map(f=>`<div><label>${f.l}</label><input name="${f.n}" type="${f.t||'text'}" class="pct-input"></div>`).join('')}</div><div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;"><div><button id="b-fq" class="pct-btn">開始篩選</button><button id="b-fc" class="pct-btn pct-btn-outline" style="margin-left: 10px;">清除條件</button></div><button id="b-ex" class="pct-btn">匯出 Excel (CSV)</button></div><div class="pct-table-container"><table class="pct-table"><thead><tr><th style="width:40px;"><input type="checkbox" id="select-all-checkbox"></th>${Object.entries(displayHeaders).map(([k,v])=>`<th class="sortable" data-sort-key="${k}" data-sort-type="${v.type}">${v.label}<span class="sort-arrow"></span></th>`).join('')}</tr></thead><tbody></tbody></table></div></div><div id="manual-pane" class="pct-view-pane"><h4>受理號碼列表 (手動輸入)</h4><div style="display:flex; gap:10px;"><textarea id="b-nums" class="pct-input" rows="15" placeholder="請在此貼上或匯入受理號碼..."></textarea><button id="imp-b" class="pct-btn pct-btn-small" style="align-self: flex-start;">匯入</button></div></div>`,
-                footer: `<div id="pct-selection-info"></div><button id="next-btn" class="pct-btn" disabled>下一步</button>`,
+                body: `<button class="pct-help-btn">?</button><div class="pct-view-toggle"><button class="pct-view-btn active" data-view="query">查詢案件</button><button class="pct-view-btn" data-view="manual">手動輸入</button></div><div id="query-pane" class="pct-view-pane active"><div class="pct-filter-form">${filterFields.map(f=>`<div><label>${f.l}</label><input name="${f.n}" type="${f.t||'text'}" class="pct-input"></div>`).join('')}</div><div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;"><div><button id="b-fc" class="pct-btn pct-btn-outline">清除條件</button></div><button id="b-ex" class="pct-btn">匯出 Excel (CSV)</button></div><div class="pct-table-container"><div class="pct-table-scroll-content"><table><thead><tr><th style="width:40px;"><input type="checkbox" id="select-all-checkbox"></th>${Object.entries(displayHeaders).map(([k,v])=>`<th class="sortable" data-sort-key="${k}" data-sort-type="${v.type}">${v.label}<span class="sort-arrow"></span></th>`).join('')}</tr></thead><tbody></tbody></table></div></div></div><div id="manual-pane" class="pct-view-pane"><h4>受理號碼列表 (手動輸入)</h4><div style="display:flex; gap:10px;"><textarea id="b-nums" class="pct-input" rows="15" placeholder="請在此貼上或匯入受理號碼..."></textarea><button id="imp-b" class="pct-btn pct-btn-small" style="align-self: flex-start;">匯入</button></div></div>`,
+                footer: `<div id="pct-selection-info"></div><button id="b-back" class="pct-btn pct-btn-outline">返回主選單</button><button id="next-btn" class="pct-btn" disabled>下一步</button>`,
                 onOpen: (m,r) => {
                     const viewBtns=m.querySelectorAll('.pct-view-btn'), panes={query:m.querySelector('#query-pane'),manual:m.querySelector('#manual-pane')}; let activeView='query';
                     const filterInputs={}; m.querySelectorAll('.pct-filter-form .pct-input').forEach(i=>filterInputs[i.name]=i);
-                    const tbody=m.querySelector('tbody'), thead=m.querySelector('thead'), infoEl=m.querySelector('#pct-selection-info'), nextBtn=m.querySelector('#next-btn'), manualTextarea=m.querySelector('#b-nums');
-                    const renderTable=(casesToRender)=>{tbody.innerHTML=casesToRender.map((c,i)=>{const rowId=allCases.indexOf(c); return`<tr data-row-id="${rowId}"><td><input type="checkbox" value="${Utils.escapeHtml(c.applyNumber)}"></td>${Object.keys(displayHeaders).map(key=>`<td title="${Utils.escapeHtml(c[key]||'')}">${Utils.escapeHtml((key==='seq')?i+1:(key==='applyDate'?Utils.formatDateForDisplay(c[key]):(c[key]||'')))}</td>`).join('')}</tr>`;}).join('');};
-                    const updateSelection=()=>{let count=0,total=allCases.length,visible=0;if(activeView==='query'){const visRows=[...tbody.children].filter(row=>!row.classList.contains('filtered-out'));const chk=visRows.map(row=>row.querySelector('input[type=checkbox]')).filter(cb=>cb&&cb.checked);count=chk.length;visible=visRows.length;}else{count=Utils.splitInput(manualTextarea.value).length;visible=count;}infoEl.textContent=activeView==='query'?`總 ${total} 筆，顯示 ${visible} 筆，已選 ${count} 筆`:`手動輸入 ${count} 筆`;nextBtn.disabled=count===0;};
+                    const tbody=m.querySelector('tbody'), thead=m.querySelector('thead'), infoEl=m.querySelector('#pct-selection-info'), nextBtn=m.querySelector('#next-btn'), manualTextarea=m.querySelector('#b-nums'), tableContainer = m.querySelector('.pct-table-container'), scrollContent = m.querySelector('.pct-table-scroll-content');
+                    let sortedCases = [], filteredCases = [];
+
+                    const updateSelection = () => { let count=0,total=allCases.length,visible=filteredCases.length;if(activeView==='query'){const chk=[...tbody.querySelectorAll('input[type=checkbox]')].filter(cb=>cb.checked);count=chk.length;}else{count=Utils.splitInput(manualTextarea.value).length;visible=count;}infoEl.textContent=activeView==='query'?`總 ${total} 筆，顯示 ${visible} 筆，已選 ${count} 筆`:`手動輸入 ${count} 筆`;nextBtn.disabled=count===0; };
+                    const renderVirtualScroll = () => { const rowHeight = 33; const visibleRows = Math.ceil(tableContainer.clientHeight / rowHeight) + 4; scrollContent.style.height = `${sortedCases.length * rowHeight}px`; let lastRenderedStart = -1; const render = () => { const scrollTop = tableContainer.scrollTop; const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 2); if (startIndex === lastRenderedStart) return; lastRenderedStart = startIndex; const endIndex = Math.min(sortedCases.length, startIndex + visibleRows); tbody.innerHTML = sortedCases.slice(startIndex, endIndex).map((c, i) => { const originalIndex = startIndex + i; const rowId = allCases.indexOf(c); return `<tr data-row-id="${rowId}" style="position:absolute; top:${originalIndex * rowHeight}px; width:100%; left:0;"><td><input type="checkbox" value="${Utils.escapeHtml(c.applyNumber)}"></td>${Object.keys(displayHeaders).map(key => `<td title="${Utils.escapeHtml(c[key] || '')}">${Utils.escapeHtml((key === 'seq') ? originalIndex + 1 : (key === 'applyDate' ? Utils.formatDateForDisplay(c[key]) : (c[key] || '')))}</td>`).join('')}</tr>`; }).join(''); }; tableContainer.onscroll = render; render(); };
+                    const applyFilters = () => { const filters = {}; Object.entries(filterInputs).forEach(([k, i]) => { if (i.value) filters[k] = i.value; }); filteredCases = allCases.filter(c => Object.entries(filters).every(([key, value]) => { if (key.endsWith('Start')) return new Date(c.applyDate) >= new Date(value); if (key.endsWith('End')) return new Date(c.applyDate) <= new Date(value); if (key === 'name') return (c.ownerName || '').toLowerCase().includes(value.toLowerCase()) || (c.insuredName || '').toLowerCase().includes(value.toLowerCase()); return String(c[key] || '').toLowerCase().includes(String(value).toLowerCase()); })); sortedCases = [...filteredCases]; renderVirtualScroll(); updateSelection(); };
+                    const debouncedFilter = Utils.debounce(applyFilters, 300);
+                    
+                    Object.values(filterInputs).forEach(input => input.addEventListener('input', debouncedFilter));
                     viewBtns.forEach(btn=>btn.addEventListener('click',()=>{const view=btn.dataset.view;if(view===activeView)return;activeView=view;viewBtns.forEach(b=>b.classList.toggle('active',b.dataset.view===view));Object.values(panes).forEach(p=>p.classList.toggle('active',p.id.startsWith(view)));updateSelection();}));
-                    m.querySelector('#b-fq').addEventListener('click',()=>{const filters={};Object.entries(filterInputs).forEach(([k,i])=>{if(i.value)filters[k]=i.value;});tbody.querySelectorAll('tr').forEach(row=>{const c=allCases[row.dataset.rowId];const isMatch=Object.entries(filters).every(([key,value])=>{if(key.endsWith('Start'))return new Date(c.applyDate)>=new Date(value);if(key.endsWith('End'))return new Date(c.applyDate)<=new Date(value);if(key==='name')return(c.ownerName||'').toLowerCase().includes(value.toLowerCase())||(c.insuredName||'').toLowerCase().includes(value.toLowerCase());return String(c[key]||'').toLowerCase().includes(String(value).toLowerCase());});row.classList.toggle('filtered-out',!isMatch);});updateSelection();});
-                    m.querySelector('#b-ex').addEventListener('click',()=>{const visData=[...tbody.querySelectorAll('tr:not(.filtered-out)')].map((row,idx)=>({...allCases[row.dataset.rowId],seq:idx+1}));if(visData.length===0)return UI.Toast.show('沒有可匯出的資料','warning');const csv=Utils.jsonToCsv(visData,exportHeaders);Utils.downloadCsv(csv,`${header}_${Utils.formatDateForDisplay(new Date().toISOString())}.csv`);});
-                    m.querySelector('#b-fc').addEventListener('click',()=>{Object.values(filterInputs).forEach(i=>i.value='');let initialData=allCases;if(defaultFilterFn){initialData=allCases.filter(defaultFilterFn);}renderTable(initialData);tbody.querySelectorAll('tr').forEach(row=>row.classList.remove('filtered-out'));updateSelection();});
+                    m.querySelector('#b-ex').addEventListener('click',()=>{const visData=sortedCases.map((c,idx)=>({...c,seq:idx+1}));if(visData.length===0)return UI.Toast.show('沒有可匯出的資料','warning');const csv=Utils.jsonToCsv(visData,exportHeaders);Utils.downloadCsv(csv,`${header}_${Utils.formatDateForDisplay(new Date().toISOString())}.csv`);});
+                    m.querySelector('#b-fc').addEventListener('click',()=>{Object.values(filterInputs).forEach(i=>i.value='');let initialData=allCases;if(defaultFilterFn){initialData=allCases.filter(defaultFilterFn);}filteredCases=initialData;sortedCases=[...initialData];renderVirtualScroll();updateSelection();});
                     tbody.addEventListener('change',e=>{if(e.target.matches('input[type=checkbox]'))updateSelection();});
-                    m.querySelector('#select-all-checkbox').addEventListener('change',e=>{const isChecked=e.target.checked;tbody.querySelectorAll('tr:not(.filtered-out) input[type=checkbox]').forEach(cb=>{if(cb)cb.checked=isChecked;});updateSelection();});
+                    m.querySelector('#select-all-checkbox').addEventListener('change',e=>{const isChecked=e.target.checked;tbody.querySelectorAll('input[type=checkbox]').forEach(cb=>{if(cb)cb.checked=isChecked;});updateSelection();});
                     tbody.addEventListener('click',e=>{if(e.target.tagName==='TD'){navigator.clipboard.writeText(e.target.textContent).then(()=>UI.Toast.show(`已複製: ${e.target.textContent}`)).catch(()=>UI.Toast.show('複製失敗','error'));}});
-                    thead.addEventListener('click',e=>{const header=e.target.closest('.sortable');if(!header)return;const key=header.dataset.sortKey;const type=header.dataset.sortType;const newDir=(header.dataset.sortDir||'desc')==='asc'?'desc':'asc';const currentRows=[...tbody.children];const sortedRows=currentRows.sort((a,b)=>{const cA=allCases[a.dataset.rowId],cB=allCases[b.dataset.rowId];let vA=cA[key]||'',vB=cB[key]||'';if(type==='number'){vA=parseFloat(vA)||0;vB=parseFloat(vB)||0;}else if(type==='date'){vA=new Date(vA).getTime()||0;vB=new Date(vB).getTime()||0;}if(vA<vB)return newDir==='asc'?-1:1;if(vA>vB)return newDir==='asc'?1:-1;return 0;});sortedRows.forEach(row=>tbody.appendChild(row));thead.querySelectorAll('.sortable').forEach(th=>{th.dataset.sortDir='';th.querySelector('.sort-arrow').textContent='';});header.dataset.sortDir=newDir;header.querySelector('.sort-arrow').textContent=newDir==='asc'?'▲':'▼';});
+                    thead.addEventListener('click',e=>{const header=e.target.closest('.sortable');if(!header)return;const key=header.dataset.sortKey;const type=header.dataset.sortType;const newDir=(header.dataset.sortDir||'desc')==='asc'?'desc':'asc';sortedCases.sort((a,b)=>{let vA=a[key]||'',vB=b[key]||'';if(type==='number'){vA=parseFloat(vA)||0;vB=parseFloat(vB)||0;}else if(type==='date'){vA=new Date(vA).getTime()||0;vB=new Date(vB).getTime()||0;}if(vA<vB)return newDir==='asc'?-1:1;if(vA>vB)return newDir==='asc'?1:-1;return 0;});renderVirtualScroll();thead.querySelectorAll('.sortable').forEach(th=>{th.dataset.sortDir='';th.querySelector('.sort-arrow').textContent='';});header.dataset.sortDir=newDir;header.querySelector('.sort-arrow').textContent=newDir==='asc'?'▲':'▼';});
                     m.querySelector('#imp-b').addEventListener('click',async()=>{try{manualTextarea.value=await Utils.readTextFile();updateSelection();UI.Toast.show(`成功匯入`,'success');}catch(e){UI.Toast.show(e.message,'error');}});
                     manualTextarea.addEventListener('input',updateSelection);
-                    nextBtn.addEventListener('click',()=>{const selectedCases=activeView==='query'?[...m.querySelectorAll('tbody tr:not(.filtered-out) input[type=checkbox]:checked')].map(cb=>cb.value):Utils.splitInput(manualTextarea.value);if(selectedCases.length===0)return UI.Toast.show('請選擇或輸入案件','error');r({action:'_next_step_',selectedCases});});
-                    let initialData=allCases;if(defaultFilterFn){initialData=allCases.filter(defaultFilterFn);}renderTable(initialData);updateSelection();
+                    m.querySelector('#b-back').addEventListener('click', () => r({ action: '_back_to_mode_' }));
+                    nextBtn.addEventListener('click',()=>{const selectedCases=activeView==='query'?[...tbody.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value):Utils.splitInput(manualTextarea.value);if(selectedCases.length===0)return UI.Toast.show('請選擇或輸入案件','error');GlobalState.set({viewState: {filters: Object.fromEntries(Object.entries(filterInputs).map(([k,v])=>[k,v.value])),sort:{key:thead.querySelector('[data-sort-dir]')?.dataset.sortKey,dir:thead.querySelector('[data-sort-dir]')?.dataset.sortDir}}});r({action:'_next_step_',selectedCases});});
+                    m.querySelector('.pct-help-btn').addEventListener('click', () => alert('功能說明：\n1. 查詢案件：上方為篩選區，輸入條件後會即時篩選下方列表。\n2. 手動輸入：切換至此頁面可直接貼上或匯入受理號碼。\n3. 列表功能：點擊欄位標題可排序，點擊儲存格可複製內容。\n4. 狀態保持：從派件人選擇返回時，會保留您的篩選和排序狀態。'));
+                    
+                    const savedState = GlobalState.get('viewState');
+                    if (savedState.filters) { Object.entries(savedState.filters).forEach(([k,v]) => { if(filterInputs[k]) filterInputs[k].value = v; }); applyFilters(); if (savedState.sort?.key) { const headerToSort = thead.querySelector(`[data-sort-key="${savedState.sort.key}"]`); if(headerToSort) { headerToSort.dataset.sortDir = savedState.sort.dir === 'asc' ? 'desc' : 'asc'; headerToSort.click(); } } } else { let initialData=allCases;if(defaultFilterFn){initialData=allCases.filter(defaultFilterFn);}filteredCases=initialData;sortedCases=[...initialData];renderVirtualScroll();updateSelection(); }
                 }
             });
         }
         
         return {
-            showTokenDialog: (retry) => UI.Modal.show({ header: `Token 設定`, width: '500px', body: `${retry ? `<div style="text-align:center; margin-bottom: 15px;"><button id="pct-retry-token" class="pct-btn pct-btn-outline">🔄 重新自動檢測</button></div>` : ''}<label for="pct-token-input">請貼上您的 SSO-TOKEN：</label><textarea id="pct-token-input" class="pct-input" rows="4">${Utils.escapeHtml(GlobalState.get('token') || '')}</textarea>`, footer: `<button id="pct-confirm-token" class="pct-btn">儲存並繼續</button>`, onOpen: (m, r) => { const i = m.querySelector('#pct-token-input'); const h = () => { const v = i.value.trim(); if (!v) return UI.Toast.show('請輸入 TOKEN', 'error'); r({ action: '_confirm_', value: v }); UI.Modal.close(); }; m.querySelector('#pct-confirm-token').addEventListener('click', h); m.querySelector('#pct-retry-token')?.addEventListener('click', () => { r({ action: '_retry_autocheck_' }); }); i.focus(); } }),
+            showTokenDialog: (retry) => UI.Modal.show({ header: `Token 設定`, width: '500px', body: `${retry ? `<div style="text-align:center; margin-bottom: 15px;"><button id="pct-retry-token" class="pct-btn pct-btn-outline">🔄 重新自動檢測</button></div>` : ''}<label for="pct-token-input">請貼上您的 SSO-TOKEN：</label><textarea id="pct-token-input" class="pct-input" rows="4">${Utils.escapeHtml(GlobalState.get('token') || '')}</textarea>`, footer: `<button id="pct-confirm-token" class="pct-btn">儲存並繼續</button>`, onOpen: (m, r) => { const i = m.querySelector('#pct-token-input'); const h = () => { const v = i.value.trim(); if (!v) return UI.Toast.show('請輸入 TOKEN', 'error'); r({ action: '_confirm_', value: v }); }; m.querySelector('#pct-confirm-token').addEventListener('click', h); m.querySelector('#pct-retry-token')?.addEventListener('click', () => r({ action: '_retry_autocheck_' })); i.focus(); } }),
             showModeSelectDialog: () => UI.Modal.show({ header: `選擇工作模式`, width: '400px', body: `<p style="text-align:center; margin-bottom:20px;">請選擇您要使用的功能：</p><div style="display:flex; flex-direction:column; gap:15px;"><button id="mode-personal" class="pct-btn">個人案件查詢與派發</button><button id="mode-batch" class="pct-btn">批次查詢與派件</button></div>`, footer: `<span>版本: ${Config.VERSION}</span><button id="presets-editor" class="pct-btn pct-btn-outline">修改預設載入</button><button id="change-token" class="pct-btn pct-btn-outline">變更 Token</button>`, onOpen: (m, r) => { m.querySelector('#mode-personal').addEventListener('click', () => r({ action: 'personal' })); m.querySelector('#mode-batch').addEventListener('click', () => r({ action: 'batch' })); m.querySelector('#change-token').addEventListener('click', () => r({ action: '_change_token_' })); m.querySelector('#presets-editor').addEventListener('click', () => r({ action: '_edit_presets_' })); } }),
             showPersonnelSelectDialog: (opts) => UI.Modal.show({ header: '選擇派件人員', width: '600px', body: `<p>您已選擇 <strong>${opts.selectedCount}</strong> 筆案件進行派件。</p><div style="margin-top: 1rem;"><label for="p-sel">指派對象</label><div class="pct-input-group"><select id="p-sel" class="pct-input"></select><button id="imp-p" class="pct-btn pct-btn-small">匯入人員</button></div></div><div style="margin-top: 1rem;"><label><input type="checkbox" id="m-chk"> 或手動輸入帳號</label><input type="text" id="m-in" class="pct-input" placeholder="請輸入完整的 AD 帳號" style="display:none;"></div>`, footer: `<button id="b-back" class="pct-btn pct-btn-outline">返回</button><button id="b-conf" class="pct-btn" disabled>確認派件</button>`, onOpen: (m, r) => { const s = m.querySelector('#p-sel'), mc = m.querySelector('#m-chk'), mi = m.querySelector('#m-in'), cf = m.querySelector('#b-conf'); const defaultList = opts.mode === 'batch' ? Config.DEFAULT_PERSONNEL_BATCH : Config.DEFAULT_PERSONNEL_PERSONAL; const regular = defaultList.filter(p => !Config.SPECIAL_PERSONNEL.includes(p)); const special = defaultList.filter(p => Config.SPECIAL_PERSONNEL.includes(p)); let pList = opts.mode === 'batch' ? [...special, ...regular] : [...regular, ...special]; const pop = () => { s.innerHTML = pList.map(p => `<option value="${Utils.escapeHtml(p)}" ${Config.SPECIAL_PERSONNEL.includes(p) ? 'style="background-color: #FFFFE0;"' : ''}>${Utils.escapeHtml(p)}</option>`).join(''); }; const upd = () => { cf.disabled = !(mc.checked ? mi.value.trim() !== '' : s.value); }; m.querySelector('#imp-p').addEventListener('click', async () => { try { const txt = await Utils.readTextFile(); const imp = Utils.splitInput(txt); if (imp.length > 0) { const combined = Array.from(new Set([...pList, ...imp])).sort(); const regularNew = combined.filter(p => !Config.SPECIAL_PERSONNEL.includes(p)); const specialNew = combined.filter(p => Config.SPECIAL_PERSONNEL.includes(p)); pList = opts.mode === 'batch' ? [...specialNew, ...regularNew] : [...regularNew, ...specialNew]; pop(); UI.Toast.show(`成功匯入 ${imp.length} 位人員`, 'success'); } } catch (e) { UI.Toast.show(e.message, 'error'); } }); mc.addEventListener('change', () => { const chk = mc.checked; mi.style.display = chk ? 'block' : 'none'; s.disabled = chk; if (chk) mi.focus(); upd(); }); s.addEventListener('change', upd); mi.addEventListener('input', upd); m.querySelector('#b-back').addEventListener('click', opts.onBack); cf.addEventListener('click', () => { const a = mc.checked ? mi.value.trim() : s.value; if (!a) return UI.Toast.show('請選擇或輸入派件人員', 'error'); r({ action: '_confirm_assignment_', assignee: a }); }); pop(); upd(); } }),
-            showPresetEditorDialog: () => UI.Modal.show({ header: '修改預設載入條件', width: '800px', body: `<p>您可以在此修改個人與批次模式的預設查詢條件。修改後將永久保存在您的瀏覽器中。</p><div style="display:flex; flex-direction:column; gap: 15px; margin-top: 15px;"><div><label><b>個人案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-personal" class="pct-input" rows="8"></textarea></div><div><label><b>批次案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-batch" class="pct-input" rows="8"></textarea></div></div>`, footer: `<button id="save-presets" class="pct-btn">保存設定</button>`, onOpen: (m,r) => { const pTxt = m.querySelector('#preset-personal'), bTxt = m.querySelector('#preset-batch'); const stored = JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}'); pTxt.value = JSON.stringify(stored.personal || Config.DEFAULT_PERSONAL_PAYLOAD, null, 2); bTxt.value = JSON.stringify(stored.batch || Config.DEFAULT_BATCH_PAYLOAD, null, 2); m.querySelector('#save-presets').addEventListener('click', () => { try { const personal = JSON.parse(pTxt.value), batch = JSON.parse(bTxt.value); localStorage.setItem(Config.PRESETS_STORAGE_KEY, JSON.stringify({ personal, batch })); UI.Toast.show('設定已儲存', 'success'); r({ action: '_saved_' }); } catch(e) { UI.Toast.show('格式錯誤，請檢查是否為有效的JSON', 'error'); } }); } }),
+            showPresetEditorDialog: () => UI.Modal.show({ header: '修改預設載入條件', width: '800px', body: `<p>您可以在此修改個人與批次模式的預設查詢條件。修改後將永久保存在您的瀏覽器中。</p><fieldset><legend><b>個人案件</b> 預設查詢條件</legend><div id="preset-personal" class="pct-filter-form"></div></fieldset><fieldset><legend><b>批次案件</b> 預設查詢條件</legend><div id="preset-batch" class="pct-filter-form"></div></fieldset>`, footer: `<button id="b-back" class="pct-btn pct-btn-outline">返回主選單</button><button id="save-presets" class="pct-btn">保存設定</button>`, onOpen: (m,r) => { const buildForm = (payload, container) => { container.innerHTML = Object.entries(payload).filter(([k]) => !Config.NON_EDITABLE_PRESETS.includes(k)).map(([key, value]) => `<div><label>${key}</label><input name="${key}" class="pct-input" value="${Utils.escapeHtml(Array.isArray(value) ? value.join(',') : value)}"></div>`).join(''); }; const stored = JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}'); const pContainer = m.querySelector('#preset-personal'), bContainer = m.querySelector('#preset-batch'); buildForm(stored.personal || Config.DEFAULT_PERSONAL_PAYLOAD, pContainer); buildForm(stored.batch || Config.DEFAULT_BATCH_PAYLOAD, bContainer); m.querySelector('#save-presets').addEventListener('click', () => { try { const personal = { ...Config.DEFAULT_PERSONAL_PAYLOAD }, batch = { ...Config.DEFAULT_BATCH_PAYLOAD }; m.querySelectorAll('#preset-personal .pct-input').forEach(i => { const key = i.name; personal[key] = Array.isArray(personal[key]) ? Utils.splitInput(i.value) : i.value; }); m.querySelectorAll('#preset-batch .pct-input').forEach(i => { const key = i.name; batch[key] = Array.isArray(batch[key]) ? Utils.splitInput(i.value) : i.value; }); localStorage.setItem(Config.PRESETS_STORAGE_KEY, JSON.stringify({ personal, batch })); UI.Toast.show('設定已儲存', 'success'); setTimeout(() => r({ action: '_saved_' }), 1000); } catch(e) { UI.Toast.show('儲存失敗', 'error'); } }); m.querySelector('#b-back').addEventListener('click', () => r({ action: '_back_' })); } }),
+            showSuccessSummaryDialog: (details) => new Promise(resolve => { let countdown = 5, intervalId, timeoutId; const cleanupAndResolve = () => { clearInterval(intervalId); clearTimeout(timeoutId); resolve(); }; UI.Modal.show({ header: '派件成功', width: '500px', body: `<p style="margin-bottom:10px;">已成功將 <strong>${details.cases.length}</strong> 筆案件指派給：<br><strong>${Utils.escapeHtml(details.assignee)}</strong></p><p>詳細受理號碼如下：</p><textarea class="pct-input" rows="8" readonly>${details.cases.join('\n')}</textarea>`, footer: `<button id="ok-btn" class="pct-btn">確定</button>`, onOpen: (modal) => { const okBtn = modal.querySelector('#ok-btn'); const close = () => { cleanupAndResolve(); UI.Modal.close(); }; modal.querySelector('.pct-modal-close-btn').onclick = close; okBtn.onclick = close; okBtn.textContent = `確定 (${countdown})`; intervalId = setInterval(() => { countdown--; if (countdown >= 0) okBtn.textContent = `確定 (${countdown})`; }, 1000); timeoutId = setTimeout(close, 5000); } }).then(cleanupAndResolve); }),
             createCaseListView, PERSONAL_FILTER_FIELDS, BATCH_FILTER_FIELDS, DISPLAY_HEADERS, EXPORT_HEADERS
         };
     })();
@@ -211,24 +227,28 @@ javascript:(function() {
      */
     const Main = (() => {
         const getPresets = () => JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}');
-        async function startPersonalCasesFlow() {
+        
+        async function startPersonalCasesFlow(keepState = false) {
+            if (!keepState) GlobalState.set({viewState: {}});
             UI.Progress.show('正在載入所有個人案件...');
             GlobalState.createAbortController();
             try {
                 const presets = getPresets();
                 const cases = await DataService.queryAllPersonalCases(presets.personal || Config.DEFAULT_PERSONAL_PAYLOAD);
                 UI.Progress.hide();
-                const res = await UIComponents.createCaseListView({ header: '個人案件查詢與派發', allCases: cases, filterFields: UIComponents.PERSONAL_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS });
+                const res = await UIComponents.createCaseListView({ header: '個人案件查詢與派發', allCases: cases, filterFields: UIComponents.PERSONAL_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS, onBack: startModeSelection });
                 if (res.action === '_next_step_') {
-                    const res2 = await UIComponents.showPersonnelSelectDialog({ selectedCount: res.selectedCases.length, mode: 'personal', onBack: startPersonalCasesFlow });
+                    const res2 = await UIComponents.showPersonnelSelectDialog({ selectedCount: res.selectedCases.length, mode: 'personal', onBack: () => startPersonalCasesFlow(true) });
                     if (res2.action === '_confirm_assignment_') {
                         UI.Progress.show('執行派件中…');
-                        try { await DataService.assignManually(res.selectedCases, res2.assignee); UI.Progress.hide(); UI.Toast.show(`成功派件 ${res.selectedCases.length} 筆`, 'success'); await Utils.sleep(1500); startModeSelection(); } catch (e) { UI.Toast.show(`派件失敗: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
+                        try { await DataService.assignManually(res.selectedCases, res2.assignee); UI.Progress.hide(); await UIComponents.showSuccessSummaryDialog({ assignee: res2.assignee, cases: res.selectedCases }); startModeSelection(); } catch (e) { UI.Toast.show(`派件失敗: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
                     }
-                }
+                } else if (res.action === '_back_to_mode_') { startModeSelection(); }
             } catch (e) { if (e.name !== 'AbortError') UI.Toast.show(`載入案件錯誤: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
         }
-        async function startBatchFlow() {
+
+        async function startBatchFlow(keepState = false) {
+            if (!keepState) GlobalState.set({viewState: {}});
             UI.Progress.show('正在載入批次案件...');
             GlobalState.createAbortController();
             let cases = [];
@@ -238,26 +258,33 @@ javascript:(function() {
                 const today = Utils.getTodayDate(); const past = Utils.getDateBefore(today, 10);
                 const dynamicFilters = { applyDateStart: Utils.formatDateForApi(past), applyDateEnd: Utils.formatDateForApi(today) };
                 cases = await DataService.queryAllBatchCases({ ...batchPayload, ...dynamicFilters });
-            } catch (e) { if (e.name !== 'AbortError') UI.Toast.show(`預設清單自動載入失敗: ${e.message}，請改用手動查詢。`, 'warning', 4000); }
+            } catch (e) {
+                if (e.name !== 'AbortError') UI.Toast.show(`預設清單自動載入失敗: ${e.message}，請改用手動查詢。`, 'warning', 4000);
+            }
             UI.Progress.hide();
+            
             const defaultFilterFn = c => { const today = Utils.getTodayDate(); const past = Utils.getDateBefore(today, 10); return c.mainStatus == '2' && new Date(c.applyDate) >= past && new Date(c.applyDate) <= today; };
-            const res = await UIComponents.createCaseListView({ header: '批次查詢與派件', allCases: cases, filterFields: UIComponents.BATCH_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS, defaultFilterFn });
+            const res = await UIComponents.createCaseListView({ header: '批次查詢與派件', allCases: cases, filterFields: UIComponents.BATCH_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS, defaultFilterFn, onBack: startModeSelection });
             if (res.action === '_next_step_') {
-                const res2 = await UIComponents.showPersonnelSelectDialog({ selectedCount: res.selectedCases.length, mode: 'batch', onBack: startBatchFlow });
+                const res2 = await UIComponents.showPersonnelSelectDialog({ selectedCount: res.selectedCases.length, mode: 'batch', onBack: () => startBatchFlow(true) });
                 if (res2.action === '_confirm_assignment_') {
                     if (!confirm(`準備將 ${res.selectedCases.length} 筆案件指派給【${res2.assignee}】？`)) { UI.Toast.show('操作已取消', 'info'); return startModeSelection(); }
                     UI.Progress.show('執行派件中…');
-                    try { await DataService.assignManually(res.selectedCases, res2.assignee); UI.Progress.hide(); UI.Toast.show(`成功派件 ${res.selectedCases.length} 筆`, 'success'); await Utils.sleep(1500); startModeSelection(); } catch (e) { UI.Toast.show(`派件失敗: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
+                    try { await DataService.assignManually(res.selectedCases, res2.assignee); UI.Progress.hide(); await UIComponents.showSuccessSummaryDialog({ assignee: res2.assignee, cases: res.selectedCases }); startModeSelection(); } catch (e) { UI.Toast.show(`派件失敗: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
                 }
-            }
+            } else if (res.action === '_back_to_mode_') { startModeSelection(); }
         }
-        async function startModeSelection() { UI.Modal.close(); const res = await UIComponents.showModeSelectDialog(); switch (res.action) { case 'personal': await startPersonalCasesFlow(); break; case 'batch': await startBatchFlow(); break; case '_change_token_': await showTokenDialogFlow(true); break; case '_edit_presets_': await UIComponents.showPresetEditorDialog(); break; } }
-        async function showTokenDialogFlow(isChanging = false) { if (isChanging) { localStorage.removeItem(Config.TOKEN_STORAGE_KEY); GlobalState.set({ token: null }); } const res = await UIComponents.showTokenDialog(!isChanging); if (res.action === '_confirm_') { GlobalState.set({ token: res.value }); localStorage.setItem(Config.TOKEN_STORAGE_KEY, res.value); UI.Toast.show('Token 已儲存', 'success'); await Utils.sleep(500); startModeSelection(); } else if (res.action === '_retry_autocheck_') { autoCheckToken(); } else { UI.Toast.show('操作已取消', 'info'); } }
-        async function autoCheckToken() { UI.Progress.show('正在自動檢測 Token...'); await Utils.sleep(300); const token = Utils.findStoredToken(); UI.Progress.hide(); if (token) { GlobalState.set({ token }); UI.Toast.show('已自動載入 Token', 'success'); await Utils.sleep(500); startModeSelection(); } else { UI.Toast.show('未找到可用 Token，請手動輸入', 'warning'); await Utils.sleep(500); showTokenDialogFlow(false); } }
+
+        async function startModeSelection() { UI.Modal.close(); const res = await UIComponents.showModeSelectDialog(); switch (res.action) { case 'personal': await startPersonalCasesFlow(); break; case 'batch': await startBatchFlow(); break; case '_change_token_': await showTokenDialogFlow(true); break; case '_edit_presets_': await showPresetEditorFlow(); break; } }
+        async function showPresetEditorFlow() { const res = await UIComponents.showPresetEditorDialog(); if (res.action === '_saved_' || res.action === '_back_') { startModeSelection(); } }
+        async function showTokenDialogFlow(isChanging = false) { if (isChanging) { localStorage.removeItem(Config.TOKEN_STORAGE_KEY); GlobalState.set({ token: null }); } const res = await UIComponents.showTokenDialog(!isChanging); if (res.action === '_confirm_') { GlobalState.set({ token: res.value }); localStorage.setItem(Config.TOKEN_STORAGE_KEY, res.value); UI.Toast.show('Token 已儲存', 'success'); UI.Modal.close(); await Utils.sleep(500); startModeSelection(); } else if (res.action === '_retry_autocheck_') { UI.Modal.close(); autoCheckToken(); } else { UI.Toast.show('操作已取消', 'info'); } }
+        async function autoCheckToken() { UI.Progress.show('正在自動檢測 Token...'); GlobalState.createAbortController(); await Utils.sleep(300); const token = Utils.findStoredToken(); if (!GlobalState.get('abortController')?.signal.aborted) { UI.Progress.hide(); if (token) { GlobalState.set({ token }); UI.Toast.show('已自動載入 Token', 'success'); await Utils.sleep(500); startModeSelection(); } else { UI.Toast.show('未找到可用 Token，請手動輸入', 'warning'); await Utils.sleep(500); showTokenDialogFlow(false); } } }
+
         function initialize() {
             UI.injectStyle();
             autoCheckToken();
         }
+        
         return { initialize };
     })();
 
