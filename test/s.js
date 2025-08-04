@@ -3,26 +3,21 @@ javascript:(function() {
 
     /**
      * =================================================================================
-     * 書籤小工具 - 多功能派件整合版 v10.1 (緊急修正版)
+     * 書籤小工具 - 多功能派件整合版 v9.2.0 (穩定版)
      * =================================================================================
      * 概述：
-     * 本版本基於一個全新的模組化架構範本進行了徹底的重構與功能移植。
-     * 它完整包含了先前版本所有的客製化功能，同時擁有更清晰、更健壯、
-     * 更易於維護的內部程式碼結構。
-     *
-     * v10.1 修正：
-     * - 緊急修復：將 v10.0 範本中的空函式替換為完整的、可執行的業務邏輯。
+     * 本版本為功能完整的穩定版，整合了所有已確認的客製化需求，並移除了
+     * 實驗性的程式碼架構，確保最佳的穩定性與可執行性。
      * =================================================================================
      */
 
     /**
      * @module Config
-     * @description 全局靜態配置與常數管理模組。
      */
     const Config = Object.freeze({
-        VERSION: '10.1.0-hotfix',
-        TOOL_ID: 'pct-multifunction-tool-container-v101',
-        STYLE_ID: 'pct-multifunction-tool-styles-v101',
+        VERSION: '9.2.0-stable',
+        TOOL_ID: 'pct-multifunction-tool-container-v92',
+        STYLE_ID: 'pct-multifunction-tool-styles-v92',
         TOKEN_STORAGE_KEY: 'euisToken',
         PRESETS_STORAGE_KEY: 'pctToolPresets_v2',
         API_ENDPOINTS: {
@@ -36,13 +31,11 @@ javascript:(function() {
         DEFAULT_PERSONAL_PAYLOAD: { applyNumber: "", policyNumber: "", mainStatus: "", subStatus: "", hint: "", ownerName: "", insuredName: "", firstBillingMethod: "", planCodeName: "", planCode: "", applyDateStart: "", applyDateEnd: "", agencyCodeName: "", replyEstimatedCompletionDateStart: "", replyEstimatedCompletionDateEnd: "", channel: "", caseLabelings: [], productLabelings: [], pageIndex: 1, size: 50, orderBys: [] },
         DEFAULT_BATCH_PAYLOAD: { applyNumber: "", policyNumber: "", org: "", poolOrg: "", uwLevels: [], poolUwLevels: [], caseLabelings: [], productLabelings: [], polpln: "", mainStatus: "2", subStatus: "", channel: "", agencyCode: "", uwApprover: null, currentOwner: null, firstBillingMethod: "", hint: "", ownerTaxId: "", ownerName: "", insuredTaxId: "", insuredName: "", applyDateStart: "", applyDateEnd: "", confrmno: "", currency: "", firstPaymentPremiumFlag: "", pageIndex: 1, size: 50, orderBys: ["applyNumber asc"] },
         BATCH_CONFIG: { pageSize: 50 },
-        ZINDEX: { NOTIFY: 2147483647, OVERLAY: 2147483640, MAIN_MODAL: 2147483641 },
-        UI_COLORS: { PRIMARY: '#007bff', PRIMARY_DARK: '#0056b3', SECONDARY: '#6C757D', SUCCESS: '#28a745', ERROR: '#dc3545', WARNING: '#fd7e14', INFO: '#17a2b8' },
+        ZINDEX: { NOTIFY: 2147483647, OVERLAY: 2147483640, MAIN_MODAL: 2147483641 }
     });
 
     /**
      * @module GlobalState
-     * @description 全局狀態管理中心。
      */
     const GlobalState = (() => {
         const state = { token: null, modalPosition: { top: null, left: null }, allPersonalCases: [], allBatchCases: [], abortController: null };
@@ -57,7 +50,6 @@ javascript:(function() {
 
     /**
      * @module Utils
-     * @description 通用工具函式庫。
      */
     const Utils = (() => {
         return {
@@ -77,14 +69,13 @@ javascript:(function() {
 
     /**
      * @module UI
-     * @description 底層 UI 元件產生器。
      */
     const UI = (() => {
         function injectStyle() {
             if (document.getElementById(Config.STYLE_ID)) return;
             const style = document.createElement('style'); style.id = Config.STYLE_ID;
             style.textContent = `
-                :root { --primary-color: ${Config.UI_COLORS.PRIMARY}; --primary-dark-color: ${Config.UI_COLORS.PRIMARY_DARK}; --secondary-color: ${Config.UI_COLORS.SECONDARY}; --success-color: ${Config.UI_COLORS.SUCCESS}; --error-color: ${Config.UI_COLORS.ERROR}; --warning-color: ${Config.UI_COLORS.WARNING}; --info-color: ${Config.UI_COLORS.INFO}; }
+                :root { --primary-color: #007bff; --primary-dark-color: #0056b3; --secondary-color: #6C757D; --success-color: #28a745; --error-color: #dc3545; --warning-color: #fd7e14; }
                 .pct-modal-mask { position: fixed; z-index: ${Config.ZINDEX.OVERLAY}; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.25s ease-out; display: flex; align-items: center; justify-content: center; }
                 .pct-modal-mask.show { opacity: 1; }
                 .pct-modal { font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif; background: #FFFFFF; border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); padding: 0; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: ${Config.ZINDEX.MAIN_MODAL}; display: flex; flex-direction: column; opacity: 0; transition: opacity 0.2s ease-out; max-height: 90vh; max-width: 95vw; box-sizing: border-box; }
@@ -152,13 +143,11 @@ javascript:(function() {
 
     /**
      * @module EventHandlers
-     * @description 通用 UI 事件處理。
      */
     const EventHandlers = (() => { const d = { iD: false, sX: 0, sY: 0, iL: 0, iT: 0 }; function dragMD(e) { const m = document.getElementById(Config.TOOL_ID); if (!m || e.target.closest('.pct-modal-close-btn')) return; e.preventDefault(); d.iD = true; m.classList.add('dragging'); const r = m.getBoundingClientRect(); d.sX = e.clientX; d.sY = e.clientY; d.iL = r.left; d.iT = r.top; document.addEventListener('mousemove', dragEl); document.addEventListener('mouseup', closeDragEl); } function dragEl(e) { if (!d.iD) return; e.preventDefault(); const m = document.getElementById(Config.TOOL_ID); if (!m) return; m.style.left = `${d.iL + e.clientX - d.sX}px`; m.style.top = `${d.iT + e.clientY - d.sY}px`; m.style.transform = 'none'; } function closeDragEl() { d.iD = false; document.getElementById(Config.TOOL_ID)?.classList.remove('dragging'); document.removeEventListener('mousemove', dragEl); document.removeEventListener('mouseup', closeDragEl); } function escKey(e) { if (e.key === 'Escape') UI.Modal.close(); } function setupKeys() { document.removeEventListener('keydown', escKey); document.addEventListener('keydown', escKey); } return { dragMouseDown: dragMD, handleEscKey: escKey, setupGlobalKeyListener: setupKeys }; })();
 
     /**
      * @module DataService
-     * @description 封裝所有 API 請求。
      */
     const DataService = (() => {
         async function baseFetch(url, options) { const token = GlobalState.get('token'); if (!token) throw new Error('TOKEN不存在'); options.headers = { ...options.headers, 'SSO-TOKEN': token, 'Content-Type': 'application/json' }; options.signal = GlobalState.get('abortController')?.signal; const response = await fetch(url, options); if (response.status === 401 || response.status === 403) throw new Error('TOKEN無效或已過期'); if (!response.ok) { const err = new Error(`伺服器錯誤_${response.status}`); try { err.data = await response.json(); } catch (e) { err.data = await response.text(); } throw err; } return response.json(); }
@@ -172,7 +161,6 @@ javascript:(function() {
 
     /**
      * @module UIComponents
-     * @description 業務相關的 UI 元件。
      */
     const UIComponents = (() => {
         const DISPLAY_HEADERS = { 'seq': { label: '序號', type: 'number' }, 'applyNumber': { label: '受理號碼', type: 'string' }, 'policyNumber': { label: '保單號碼', type: 'string' }, 'ownerName': { label: '要保人', type: 'string' }, 'insuredName': { label: '被保人', type: 'string' }, 'mainStatus': { label: '主狀態', type: 'string' }, 'subStatus': { label: '次狀態', type: 'string' }, 'currentOwner': { label: '目前處理人', type: 'string' }, 'channel': { label: '業務來源', type: 'string' }, 'applyDate': { label: '要保日', type: 'date' }, 'polpln': { label: '險種代碼', type: 'string' }, 'agencyCode': { label: '送件單位代碼', type: 'string' } };
@@ -205,47 +193,15 @@ javascript:(function() {
                     nextBtn.addEventListener('click',()=>{const selectedCases=activeView==='query'?[...m.querySelectorAll('tbody tr:not(.filtered-out) input[type=checkbox]:checked')].map(cb=>cb.value):Utils.splitInput(manualTextarea.value);if(selectedCases.length===0)return UI.Toast.show('請選擇或輸入案件','error');r({action:'_next_step_',selectedCases});});
                     let initialData=allCases;if(defaultFilterFn){initialData=allCases.filter(defaultFilterFn);}renderTable(initialData);updateSelection();
                 }
-            },
-            showPersonnelSelectDialog: (opts) => UI.Modal.show({
-                header: '選擇派件人員', width: '600px',
-                body: `<p>您已選擇 <strong>${opts.selectedCount}</strong> 筆案件進行派件。</p><div style="margin-top: 1rem;"><label for="p-sel">指派對象</label><div class="pct-input-group"><select id="p-sel" class="pct-input"></select><button id="imp-p" class="pct-btn pct-btn-small">匯入人員</button></div></div><div style="margin-top: 1rem;"><label><input type="checkbox" id="m-chk"> 或手動輸入帳號</label><input type="text" id="m-in" class="pct-input" placeholder="請輸入完整的 AD 帳號" style="display:none;"></div>`,
-                footer: `<button id="b-back" class="pct-btn pct-btn-outline">返回</button><button id="b-conf" class="pct-btn" disabled>確認派件</button>`,
-                onOpen: (m, r) => {
-                    const s = m.querySelector('#p-sel'), mc = m.querySelector('#m-chk'), mi = m.querySelector('#m-in'), cf = m.querySelector('#b-conf');
-                    const defaultList = opts.mode === 'batch' ? Config.DEFAULT_PERSONNEL_BATCH : Config.DEFAULT_PERSONNEL_PERSONAL;
-                    const regular = defaultList.filter(p => !Config.SPECIAL_PERSONNEL.includes(p));
-                    const special = defaultList.filter(p => Config.SPECIAL_PERSONNEL.includes(p));
-                    let pList = opts.mode === 'batch' ? [...special, ...regular] : [...regular, ...special];
-                    const pop = () => { s.innerHTML = pList.map(p => `<option value="${Utils.escapeHtml(p)}" ${Config.SPECIAL_PERSONNEL.includes(p) ? 'style="background-color: #FFFFE0;"' : ''}>${Utils.escapeHtml(p)}</option>`).join(''); };
-                    const upd = () => { cf.disabled = !(mc.checked ? mi.value.trim() !== '' : s.value); };
-                    m.querySelector('#imp-p').addEventListener('click', async () => { try { const txt = await Utils.readTextFile(); const imp = Utils.splitInput(txt); if (imp.length > 0) { const combined = Array.from(new Set([...pList, ...imp])).sort(); const regularNew = combined.filter(p => !Config.SPECIAL_PERSONNEL.includes(p)); const specialNew = combined.filter(p => Config.SPECIAL_PERSONNEL.includes(p)); pList = opts.mode === 'batch' ? [...specialNew, ...regularNew] : [...regularNew, ...specialNew]; pop(); UI.Toast.show(`成功匯入 ${imp.length} 位人員`, 'success'); } } catch (e) { UI.Toast.show(e.message, 'error'); } });
-                    mc.addEventListener('change', () => { const chk = mc.checked; mi.style.display = chk ? 'block' : 'none'; s.disabled = chk; if (chk) mi.focus(); upd(); });
-                    s.addEventListener('change', upd); mi.addEventListener('input', upd);
-                    m.querySelector('#b-back').addEventListener('click', opts.onBack);
-                    cf.addEventListener('click', () => { const a = mc.checked ? mi.value.trim() : s.value; if (!a) return UI.Toast.show('請選擇或輸入派件人員', 'error'); r({ action: '_confirm_assignment_', assignee: a }); });
-                    pop(); upd();
-                }
-            }),
-            showPresetEditorDialog: () => UI.Modal.show({
-                header: '修改預設載入條件', width: '800px',
-                body: `<p>您可以在此修改個人與批次模式的預設查詢條件。修改後將永久保存在您的瀏覽器中。</p><div style="display:flex; flex-direction:column; gap: 15px; margin-top: 15px;"><div><label><b>個人案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-personal" class="pct-input" rows="8"></textarea></div><div><label><b>批次案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-batch" class="pct-input" rows="8"></textarea></div></div>`,
-                footer: `<button id="save-presets" class="pct-btn">保存設定</button>`,
-                onOpen: (m,r) => {
-                    const personalText = m.querySelector('#preset-personal'), batchText = m.querySelector('#preset-batch');
-                    const stored = JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}');
-                    personalText.value = JSON.stringify(stored.personal || Config.DEFAULT_PERSONAL_PAYLOAD, null, 2);
-                    batchText.value = JSON.stringify(stored.batch || Config.DEFAULT_BATCH_PAYLOAD, null, 2);
-                    m.querySelector('#save-presets').addEventListener('click', () => {
-                        try {
-                            const personal = JSON.parse(personalText.value), batch = JSON.parse(batchText.value);
-                            localStorage.setItem(Config.PRESETS_STORAGE_KEY, JSON.stringify({ personal, batch }));
-                            UI.Toast.show('設定已儲存', 'success');
-                            r({ action: '_saved_' });
-                        } catch(e) { UI.Toast.show('格式錯誤，請檢查是否為有效的JSON', 'error'); }
-                    });
-                }
-            }),
-            PERSONAL_FILTER_FIELDS, BATCH_FILTER_FIELDS, DISPLAY_HEADERS, EXPORT_HEADERS
+            });
+        }
+        
+        return {
+            showTokenDialog: (retry) => UI.Modal.show({ header: `Token 設定`, width: '500px', body: `${retry ? `<div style="text-align:center; margin-bottom: 15px;"><button id="pct-retry-token" class="pct-btn pct-btn-outline">🔄 重新自動檢測</button></div>` : ''}<label for="pct-token-input">請貼上您的 SSO-TOKEN：</label><textarea id="pct-token-input" class="pct-input" rows="4">${Utils.escapeHtml(GlobalState.get('token') || '')}</textarea>`, footer: `<button id="pct-confirm-token" class="pct-btn">儲存並繼續</button>`, onOpen: (m, r) => { const i = m.querySelector('#pct-token-input'); const h = () => { const v = i.value.trim(); if (!v) return UI.Toast.show('請輸入 TOKEN', 'error'); r({ action: '_confirm_', value: v }); UI.Modal.close(); }; m.querySelector('#pct-confirm-token').addEventListener('click', h); m.querySelector('#pct-retry-token')?.addEventListener('click', () => { r({ action: '_retry_autocheck_' }); }); i.focus(); } }),
+            showModeSelectDialog: () => UI.Modal.show({ header: `選擇工作模式`, width: '400px', body: `<p style="text-align:center; margin-bottom:20px;">請選擇您要使用的功能：</p><div style="display:flex; flex-direction:column; gap:15px;"><button id="mode-personal" class="pct-btn">個人案件查詢與派發</button><button id="mode-batch" class="pct-btn">批次查詢與派件</button></div>`, footer: `<span>版本: ${Config.VERSION}</span><button id="presets-editor" class="pct-btn pct-btn-outline">修改預設載入</button><button id="change-token" class="pct-btn pct-btn-outline">變更 Token</button>`, onOpen: (m, r) => { m.querySelector('#mode-personal').addEventListener('click', () => r({ action: 'personal' })); m.querySelector('#mode-batch').addEventListener('click', () => r({ action: 'batch' })); m.querySelector('#change-token').addEventListener('click', () => r({ action: '_change_token_' })); m.querySelector('#presets-editor').addEventListener('click', () => r({ action: '_edit_presets_' })); } }),
+            showPersonnelSelectDialog: (opts) => UI.Modal.show({ header: '選擇派件人員', width: '600px', body: `<p>您已選擇 <strong>${opts.selectedCount}</strong> 筆案件進行派件。</p><div style="margin-top: 1rem;"><label for="p-sel">指派對象</label><div class="pct-input-group"><select id="p-sel" class="pct-input"></select><button id="imp-p" class="pct-btn pct-btn-small">匯入人員</button></div></div><div style="margin-top: 1rem;"><label><input type="checkbox" id="m-chk"> 或手動輸入帳號</label><input type="text" id="m-in" class="pct-input" placeholder="請輸入完整的 AD 帳號" style="display:none;"></div>`, footer: `<button id="b-back" class="pct-btn pct-btn-outline">返回</button><button id="b-conf" class="pct-btn" disabled>確認派件</button>`, onOpen: (m, r) => { const s = m.querySelector('#p-sel'), mc = m.querySelector('#m-chk'), mi = m.querySelector('#m-in'), cf = m.querySelector('#b-conf'); const defaultList = opts.mode === 'batch' ? Config.DEFAULT_PERSONNEL_BATCH : Config.DEFAULT_PERSONNEL_PERSONAL; const regular = defaultList.filter(p => !Config.SPECIAL_PERSONNEL.includes(p)); const special = defaultList.filter(p => Config.SPECIAL_PERSONNEL.includes(p)); let pList = opts.mode === 'batch' ? [...special, ...regular] : [...regular, ...special]; const pop = () => { s.innerHTML = pList.map(p => `<option value="${Utils.escapeHtml(p)}" ${Config.SPECIAL_PERSONNEL.includes(p) ? 'style="background-color: #FFFFE0;"' : ''}>${Utils.escapeHtml(p)}</option>`).join(''); }; const upd = () => { cf.disabled = !(mc.checked ? mi.value.trim() !== '' : s.value); }; m.querySelector('#imp-p').addEventListener('click', async () => { try { const txt = await Utils.readTextFile(); const imp = Utils.splitInput(txt); if (imp.length > 0) { const combined = Array.from(new Set([...pList, ...imp])).sort(); const regularNew = combined.filter(p => !Config.SPECIAL_PERSONNEL.includes(p)); const specialNew = combined.filter(p => Config.SPECIAL_PERSONNEL.includes(p)); pList = opts.mode === 'batch' ? [...specialNew, ...regularNew] : [...regularNew, ...specialNew]; pop(); UI.Toast.show(`成功匯入 ${imp.length} 位人員`, 'success'); } } catch (e) { UI.Toast.show(e.message, 'error'); } }); mc.addEventListener('change', () => { const chk = mc.checked; mi.style.display = chk ? 'block' : 'none'; s.disabled = chk; if (chk) mi.focus(); upd(); }); s.addEventListener('change', upd); mi.addEventListener('input', upd); m.querySelector('#b-back').addEventListener('click', opts.onBack); cf.addEventListener('click', () => { const a = mc.checked ? mi.value.trim() : s.value; if (!a) return UI.Toast.show('請選擇或輸入派件人員', 'error'); r({ action: '_confirm_assignment_', assignee: a }); }); pop(); upd(); } }),
+            showPresetEditorDialog: () => UI.Modal.show({ header: '修改預設載入條件', width: '800px', body: `<p>您可以在此修改個人與批次模式的預設查詢條件。修改後將永久保存在您的瀏覽器中。</p><div style="display:flex; flex-direction:column; gap: 15px; margin-top: 15px;"><div><label><b>個人案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-personal" class="pct-input" rows="8"></textarea></div><div><label><b>批次案件</b> 預設查詢條件 (JSON格式)</label><textarea id="preset-batch" class="pct-input" rows="8"></textarea></div></div>`, footer: `<button id="save-presets" class="pct-btn">保存設定</button>`, onOpen: (m,r) => { const pTxt = m.querySelector('#preset-personal'), bTxt = m.querySelector('#preset-batch'); const stored = JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}'); pTxt.value = JSON.stringify(stored.personal || Config.DEFAULT_PERSONAL_PAYLOAD, null, 2); bTxt.value = JSON.stringify(stored.batch || Config.DEFAULT_BATCH_PAYLOAD, null, 2); m.querySelector('#save-presets').addEventListener('click', () => { try { const personal = JSON.parse(pTxt.value), batch = JSON.parse(bTxt.value); localStorage.setItem(Config.PRESETS_STORAGE_KEY, JSON.stringify({ personal, batch })); UI.Toast.show('設定已儲存', 'success'); r({ action: '_saved_' }); } catch(e) { UI.Toast.show('格式錯誤，請檢查是否為有效的JSON', 'error'); } }); } }),
+            createCaseListView, PERSONAL_FILTER_FIELDS, BATCH_FILTER_FIELDS, DISPLAY_HEADERS, EXPORT_HEADERS
         };
     })();
 
@@ -255,7 +211,6 @@ javascript:(function() {
      */
     const Main = (() => {
         const getPresets = () => JSON.parse(localStorage.getItem(Config.PRESETS_STORAGE_KEY) || '{}');
-        
         async function startPersonalCasesFlow() {
             UI.Progress.show('正在載入所有個人案件...');
             GlobalState.createAbortController();
@@ -273,7 +228,6 @@ javascript:(function() {
                 }
             } catch (e) { if (e.name !== 'AbortError') UI.Toast.show(`載入案件錯誤: ${e.message}`, 'error', 5000); UI.Progress.hide(); }
         }
-
         async function startBatchFlow() {
             UI.Progress.show('正在載入批次案件...');
             GlobalState.createAbortController();
@@ -284,12 +238,10 @@ javascript:(function() {
                 const today = Utils.getTodayDate(); const past = Utils.getDateBefore(today, 10);
                 const dynamicFilters = { applyDateStart: Utils.formatDateForApi(past), applyDateEnd: Utils.formatDateForApi(today) };
                 cases = await DataService.queryAllBatchCases({ ...batchPayload, ...dynamicFilters });
-            } catch (e) {
-                if (e.name !== 'AbortError') UI.Toast.show(`預設清單自動載入失敗: ${e.message}，請改用手動查詢。`, 'warning', 4000);
-            }
+            } catch (e) { if (e.name !== 'AbortError') UI.Toast.show(`預設清單自動載入失敗: ${e.message}，請改用手動查詢。`, 'warning', 4000); }
             UI.Progress.hide();
-            
-            const res = await UIComponents.createCaseListView({ header: '批次查詢與派件', allCases: cases, filterFields: UIComponents.BATCH_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS, defaultFilterFn: c => { const today = Utils.getTodayDate(); const past = Utils.getDateBefore(today, 10); return c.mainStatus == '2' && new Date(c.applyDate) >= past && new Date(c.applyDate) <= today; } });
+            const defaultFilterFn = c => { const today = Utils.getTodayDate(); const past = Utils.getDateBefore(today, 10); return c.mainStatus == '2' && new Date(c.applyDate) >= past && new Date(c.applyDate) <= today; };
+            const res = await UIComponents.createCaseListView({ header: '批次查詢與派件', allCases: cases, filterFields: UIComponents.BATCH_FILTER_FIELDS, displayHeaders: UIComponents.DISPLAY_HEADERS, exportHeaders: UIComponents.EXPORT_HEADERS, defaultFilterFn });
             if (res.action === '_next_step_') {
                 const res2 = await UIComponents.showPersonnelSelectDialog({ selectedCount: res.selectedCases.length, mode: 'batch', onBack: startBatchFlow });
                 if (res2.action === '_confirm_assignment_') {
@@ -299,16 +251,13 @@ javascript:(function() {
                 }
             }
         }
-
         async function startModeSelection() { UI.Modal.close(); const res = await UIComponents.showModeSelectDialog(); switch (res.action) { case 'personal': await startPersonalCasesFlow(); break; case 'batch': await startBatchFlow(); break; case '_change_token_': await showTokenDialogFlow(true); break; case '_edit_presets_': await UIComponents.showPresetEditorDialog(); break; } }
         async function showTokenDialogFlow(isChanging = false) { if (isChanging) { localStorage.removeItem(Config.TOKEN_STORAGE_KEY); GlobalState.set({ token: null }); } const res = await UIComponents.showTokenDialog(!isChanging); if (res.action === '_confirm_') { GlobalState.set({ token: res.value }); localStorage.setItem(Config.TOKEN_STORAGE_KEY, res.value); UI.Toast.show('Token 已儲存', 'success'); await Utils.sleep(500); startModeSelection(); } else if (res.action === '_retry_autocheck_') { autoCheckToken(); } else { UI.Toast.show('操作已取消', 'info'); } }
         async function autoCheckToken() { UI.Progress.show('正在自動檢測 Token...'); await Utils.sleep(300); const token = Utils.findStoredToken(); UI.Progress.hide(); if (token) { GlobalState.set({ token }); UI.Toast.show('已自動載入 Token', 'success'); await Utils.sleep(500); startModeSelection(); } else { UI.Toast.show('未找到可用 Token，請手動輸入', 'warning'); await Utils.sleep(500); showTokenDialogFlow(false); } }
-
         function initialize() {
             UI.injectStyle();
             autoCheckToken();
         }
-        
         return { initialize };
     })();
 
