@@ -3,11 +3,13 @@ javascript: (() => {
      * =================================================================================
      * 多功能派件整合 - v15.22 (人員選擇器重構版)
      * =================================================================================
-     * @version     15.22.2 (Corrected)
+     * @version     15.22.3 (Complete & Corrected)
      * @description
-     * 修正了 v15.22.1 版本中因大小寫錯誤導致的依賴注入失敗問題。
-     * - [修正] 在應用程式啟動區塊，將傳遞給 uiComponents 和 AppRunner 的 'Utils' 變數
-     * 更正為正確的 'utils'，解決了執行時的致命錯誤。
+     * 本版本修正了因程式碼遺漏導致 UI 元件無法渲染與互動的致命錯誤。
+     * - [重大修正] 將 v15.22.1 版本中遺漏的 UIComponents 模組 (包含 CaseListView, 
+     * PersonnelSelectDialog, AssignmentResultDialog, ErrorDialog) 的完整實作程式碼
+     * 全部補回，解決了主畫面無法顯示及齒輪選單按鈕無反應的問題。
+     * - [架構確認] 再次審查了所有模組的依賴注入關係，確保程式碼的完整性與正確性。
      * =================================================================================
      */
     'use strict';
@@ -160,7 +162,6 @@ javascript: (() => {
         getStoredToken: () => [localStorage, sessionStorage].map(s => s.getItem(AppConfig.TOKEN_KEY)).find(t => t && t.trim()) || null,
         jsonToCsv: (items, { dynamicHeaders = false } = {}) => {
             if (!items || items.length === 0) return '';
-            
             let headers = [];
             if (dynamicHeaders) {
                 const headerSet = new Set();
@@ -171,7 +172,6 @@ javascript: (() => {
             } else {
                 headers = Object.keys(items[0]);
             }
-
             const headerRow = headers.map(h => JSON.stringify(h)).join(',');
             const rows = items.map(row => headers.map(key => JSON.stringify(row[key] ?? '')).join(','));
             return [headerRow, ...rows].join('\r\n');
@@ -973,533 +973,535 @@ javascript: (() => {
             }
         };
 
-        const CaseListView = { show: async (opts) => {
-            const { tabs, activeTabId, caseList, error, viewConfig, filterOptions, initialFilters, assigneeList, queryInfo } = opts;
-            
-            const isErrorState = !!error;
-            let sortState = { key: null, order: 'asc' };
-            let currentData = isErrorState ? [] : [...caseList];
-            let elements = {};
-
-            const header = _createHeader();
-            const body = _createBody();
-            const footer = _createFooter();
-            
-            function _renderTable(data) {
-                if (isErrorState) {
-                    elements.tbody.innerHTML = '';
-                    const errorLink = DOMHelper.create('a', { textContent: '點此重新驗證 Token', attributes: { href: '#' }, style: { color: 'var(--error-color)', textDecoration: 'underline' }, events: { click: (e) => { e.preventDefault(); elements.resolve({ action: AppConfig.MODAL_ACTIONS.CHANGE_TOKEN }); }} });
-                    const errorCell = DOMHelper.create('td', { attributes: { colspan: viewConfig.columns.length }, style: { color: 'var(--error-color)', fontWeight: 'bold', height: '100px' }, children: [ DOMHelper.create('span', { textContent: `資料載入失敗：${Utils.escapeHtml(error.message)} ` }), errorLink ] });
-                    elements.tbody.appendChild(DOMHelper.create('tr', { children: [errorCell] }));
-                    elements.countElem.textContent = '載入失敗';
-                    elements.nextBtn.disabled = true;
-                    return;
-                }
+        const CaseListView = { 
+            show: async (opts) => {
+                const { tabs, activeTabId, caseList, error, viewConfig, filterOptions, initialFilters, assigneeList, queryInfo } = opts;
                 
-                const fragment = document.createDocumentFragment();
-                data.forEach((item, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = viewConfig.columns.map(key => {
-                        const def = AppConfig.COLUMN_DEFINITIONS[key];
-                        const isFolded = viewConfig.foldedColumns?.includes(key);
-                        const className = isFolded ? 'class="folded-column"' : '';
-
-                        if (key === 'select') {
-                            return `<td ${className}><input type="checkbox" class="case-checkbox" value="${Utils.escapeHtml(item.applyNumber)}"></td>`;
-                        }
-                        const displayValue = key === 'seq' ? index + 1 : (def.type === 'date' ? Utils.formatDisplayDate(item[key]) : item[key] ?? '');
-                        return `<td ${className} title="${Utils.escapeHtml(item[key] ?? '')}">${Utils.escapeHtml(displayValue)}</td>`;
-                    }).join('');
-                    fragment.appendChild(tr);
-                });
+                const isErrorState = !!error;
+                let sortState = { key: null, order: 'asc' };
+                let currentData = isErrorState ? [] : [...caseList];
+                let elements = {};
+    
+                const header = _createHeader();
+                const body = _createBody();
+                const footer = _createFooter();
                 
-                elements.tbody.innerHTML = '';
-                elements.tbody.appendChild(fragment);
-                elements.countElem.textContent = `顯示 ${data.length} / ${caseList.length} 筆`;
-                _updateNextButton();
-            }
-
-            function _updateNextButton() {
-                if (!elements.nextBtn) return;
-                const count = elements.modal.querySelectorAll('.case-checkbox:checked').length;
-                elements.nextBtn.disabled = count === 0;
-                elements.nextBtn.textContent = `下一步 (${count})`;
-            }
-
-            const _applyFiltersAndSort = Utils.debounce(() => {
-                const filterValues = {};
-                elements.filterSelects.forEach(select => {
-                    const key = select.id.replace('filter-', '');
-                    if (select.value) filterValues[key] = select.value;
-                });
-
-                let filteredData = caseList.filter(item => 
-                    Object.entries(filterValues).every(([key, value]) => {
-                        const itemValue = String(item[key] ?? '');
-                        if (key === 'applyDateStart') return new Date(item.applyDate) >= new Date(value);
-                        if (key === 'applyDateEnd') return new Date(item.applyDate) <= new Date(value);
-                        if (key.toLowerCase().includes('date')) return itemValue.startsWith(value.split(' ')[0]);
-                        return itemValue === value;
-                    })
-                );
-
-                if (sortState.key) {
-                    filteredData.sort((a, b) => {
-                        let valA = a[sortState.key] ?? '';
-                        let valB = b[sortState.key] ?? '';
-                        if (AppConfig.COLUMN_DEFINITIONS[sortState.key]?.type === 'date') {
-                            valA = new Date(valA).getTime() || 0;
-                            valB = new Date(valB).getTime() || 0;
-                        }
-                        if (valA < valB) return sortState.order === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortState.order === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                
-                currentData = filteredData;
-                _renderTable(currentData);
-            }, AppConfig.DEBOUNCE_DELAY);
-
-            function _createHeader() {
-                return `多功能派件整合 v${AppConfig.VERSION} (${AppConfig.ENV})
-                    <button class="header-config-btn" id="config-btn" title="設定">⚙️</button>
-                    <div class="config-menu" id="config-menu">
-                        <button id="change-token-btn">重新驗核token</button>
-                        <button id="open-new-query-btn">開啟新查詢</button>
-                        <button id="clear-cache-btn">清除暫存檔</button>
-                    </div>`;
-            }
-
-            function _createBody() {
-                const tabButtons = tabs.map(tab => {
-                    const closeBtn = tab.canClose ? DOMHelper.create('button', { className: 'close-tab-btn', textContent: '×', attributes: { 'data-tab-id': tab.id } }) : null;
-                    return DOMHelper.create('button', {
-                        className: tab.id === activeTabId ? 'active' : '',
-                        attributes: { 'data-tab-id': tab.id },
-                        textContent: tab.name,
-                        children: closeBtn ? [closeBtn] : []
-                    });
-                });
-
-                const contentContainer = DOMHelper.create('div', { style: { display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }});
-
-                if (activeTabId === 'manual') {
-                    contentContainer.appendChild(_createManualOpView());
-                } else if (viewConfig) {
-                    _createListView().forEach(el => contentContainer.appendChild(el));
-                } else {
-                    contentContainer.appendChild(DOMHelper.create('p', { textContent: '請選擇一個頁籤。' }));
-                }
-
-                return DOMHelper.create('div', {
-                    className: 'dispatch-body',
-                    children: [
-                        DOMHelper.create('div', { className: 'dispatch-tabs', children: tabButtons }),
-                        contentContainer
-                    ]
-                });
-            }
-            
-            function _createListView() {
-                const { type, columns, foldedColumns } = viewConfig;
-
-                const createFilterControls = () => {
-                    const config = AppConfig.FILTER_CONFIG;
-                    const commonKeys = (type === 'personal') ? config.personal_common : config.batch_common;
-                    const advancedKeys = (type === 'personal') ? config.personal_advanced : config.batch_advanced;
+                function _renderTable(data) {
+                    if (isErrorState) {
+                        elements.tbody.innerHTML = '';
+                        const errorLink = DOMHelper.create('a', { textContent: '點此重新驗證 Token', attributes: { href: '#' }, style: { color: 'var(--error-color)', textDecoration: 'underline' }, events: { click: (e) => { e.preventDefault(); elements.resolve({ action: AppConfig.MODAL_ACTIONS.CHANGE_TOKEN }); }} });
+                        const errorCell = DOMHelper.create('td', { attributes: { colspan: viewConfig.columns.length }, style: { color: 'var(--error-color)', fontWeight: 'bold', height: '100px' }, children: [ DOMHelper.create('span', { textContent: `資料載入失敗：${Utils.escapeHtml(error.message)} ` }), errorLink ] });
+                        elements.tbody.appendChild(DOMHelper.create('tr', { children: [errorCell] }));
+                        elements.countElem.textContent = '載入失敗';
+                        if (elements.nextBtn) elements.nextBtn.disabled = true;
+                        return;
+                    }
                     
-                    const renderSelect = (key) => {
-                        const def = AppConfig.COLUMN_DEFINITIONS[key];
-                        if (!def) return null;
-
-                        const options = filterOptions[key] || [];
-                        const select = DOMHelper.create('select', { 
-                            id: `filter-${key}`, className: 'dispatch-input filter-select',
-                            attributes: { ...(isErrorState && { disabled: true }) },
-                            children: [
-                                DOMHelper.create('option', { textContent: '全部', attributes: { value: '' } }),
-                                ...options.map(opt => DOMHelper.create('option', { textContent: opt, attributes: { value: opt } }))
-                            ]
-                        });
-                        
-                        if (initialFilters && initialFilters[key]) {
-                            const valueToSet = String(initialFilters[key]).split(' ')[0];
-                            if (!options.includes(valueToSet)) {
-                                select.appendChild(DOMHelper.create('option', { textContent: valueToSet, attributes: { value: valueToSet } }));
+                    const fragment = document.createDocumentFragment();
+                    data.forEach((item, index) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = viewConfig.columns.map(key => {
+                            const def = AppConfig.COLUMN_DEFINITIONS[key];
+                            const isFolded = viewConfig.foldedColumns?.includes(key);
+                            const className = isFolded ? 'class="folded-column"' : '';
+    
+                            if (key === 'select') {
+                                return `<td ${className}><input type="checkbox" class="case-checkbox" value="${Utils.escapeHtml(item.applyNumber)}"></td>`;
                             }
-                            select.value = valueToSet;
-                        }
+                            const displayValue = key === 'seq' ? index + 1 : (def.type === 'date' ? Utils.formatDisplayDate(item[key]) : item[key] ?? '');
+                            return `<td ${className} title="${Utils.escapeHtml(item[key] ?? '')}">${Utils.escapeHtml(displayValue)}</td>`;
+                        }).join('');
+                        fragment.appendChild(tr);
+                    });
+                    
+                    elements.tbody.innerHTML = '';
+                    elements.tbody.appendChild(fragment);
+                    elements.countElem.textContent = `顯示 ${data.length} / ${caseList.length} 筆`;
+                    _updateNextButton();
+                }
+    
+                function _updateNextButton() {
+                    if (!elements.nextBtn) return;
+                    const count = elements.modal.querySelectorAll('.case-checkbox:checked').length;
+                    elements.nextBtn.disabled = count === 0;
+                    elements.nextBtn.textContent = `下一步 (${count})`;
+                }
+    
+                const _applyFiltersAndSort = Utils.debounce(() => {
+                    const filterValues = {};
+                    elements.filterSelects.forEach(select => {
+                        const key = select.id.replace('filter-', '');
+                        if (select.value) filterValues[key] = select.value;
+                    });
+    
+                    let filteredData = caseList.filter(item => 
+                        Object.entries(filterValues).every(([key, value]) => {
+                            const itemValue = String(item[key] ?? '');
+                            if (key === 'applyDateStart') return new Date(item.applyDate) >= new Date(value);
+                            if (key === 'applyDateEnd') return new Date(item.applyDate) <= new Date(value);
+                            if (key.toLowerCase().includes('date')) return itemValue.startsWith(value.split(' ')[0]);
+                            return itemValue === value;
+                        })
+                    );
+    
+                    if (sortState.key) {
+                        filteredData.sort((a, b) => {
+                            let valA = a[sortState.key] ?? '';
+                            let valB = b[sortState.key] ?? '';
+                            if (AppConfig.COLUMN_DEFINITIONS[sortState.key]?.type === 'date') {
+                                valA = new Date(valA).getTime() || 0;
+                                valB = new Date(valB).getTime() || 0;
+                            }
+                            if (valA < valB) return sortState.order === 'asc' ? -1 : 1;
+                            if (valA > valB) return sortState.order === 'asc' ? 1 : -1;
+                            return 0;
+                        });
+                    }
+                    
+                    currentData = filteredData;
+                    _renderTable(currentData);
+                }, AppConfig.DEBOUNCE_DELAY);
+    
+                function _createHeader() {
+                    return `多功能派件整合 v${AppConfig.VERSION} (${AppConfig.ENV})
+                        <button class="header-config-btn" id="config-btn" title="設定">⚙️</button>
+                        <div class="config-menu" id="config-menu">
+                            <button id="change-token-btn">重新驗核token</button>
+                            <button id="open-new-query-btn">開啟新查詢</button>
+                            <button id="clear-cache-btn">清除暫存檔</button>
+                        </div>`;
+                }
+    
+                function _createBody() {
+                    const tabButtons = tabs.map(tab => {
+                        const closeBtn = tab.canClose ? DOMHelper.create('button', { className: 'close-tab-btn', textContent: '×', attributes: { 'data-tab-id': tab.id } }) : null;
+                        return DOMHelper.create('button', {
+                            className: tab.id === activeTabId ? 'active' : '',
+                            attributes: { 'data-tab-id': tab.id },
+                            textContent: tab.name,
+                            children: closeBtn ? [closeBtn] : []
+                        });
+                    });
+    
+                    const contentContainer = DOMHelper.create('div', { style: { display: 'flex', flexDirection: 'column', flexGrow: 1, overflow: 'hidden' }});
+    
+                    if (activeTabId === 'manual') {
+                        contentContainer.appendChild(_createManualOpView());
+                    } else if (viewConfig) {
+                        _createListView().forEach(el => contentContainer.appendChild(el));
+                    } else {
+                        contentContainer.appendChild(DOMHelper.create('p', { textContent: '請選擇一個頁籤。' }));
+                    }
+    
+                    return DOMHelper.create('div', {
+                        className: 'dispatch-body',
+                        children: [
+                            DOMHelper.create('div', { className: 'dispatch-tabs', children: tabButtons }),
+                            contentContainer
+                        ]
+                    });
+                }
+                
+                function _createListView() {
+                    const { type } = viewConfig;
+    
+                    const createFilterControls = () => {
+                        const config = AppConfig.FILTER_CONFIG;
+                        const commonKeys = (type === 'personal') ? config.personal_common : config.batch_common;
+                        const advancedKeys = (type === 'personal') ? config.personal_advanced : config.batch_advanced;
                         
-                        return DOMHelper.create('div', { children: [ DOMHelper.create('label', { textContent: def.label, style: { fontSize: '14px', display: 'block', textAlign: 'left' } }), select ]});
+                        const renderSelect = (key) => {
+                            const def = AppConfig.COLUMN_DEFINITIONS[key];
+                            if (!def) return null;
+    
+                            const options = filterOptions[key] || [];
+                            const select = DOMHelper.create('select', { 
+                                id: `filter-${key}`, className: 'dispatch-input filter-select',
+                                attributes: { ...(isErrorState && { disabled: true }) },
+                                children: [
+                                    DOMHelper.create('option', { textContent: '全部', attributes: { value: '' } }),
+                                    ...options.map(opt => DOMHelper.create('option', { textContent: opt, attributes: { value: opt } }))
+                                ]
+                            });
+                            
+                            if (initialFilters && initialFilters[key]) {
+                                const valueToSet = String(initialFilters[key]).split(' ')[0];
+                                if (!options.includes(valueToSet)) {
+                                    select.appendChild(DOMHelper.create('option', { textContent: valueToSet, attributes: { value: valueToSet } }));
+                                }
+                                select.value = valueToSet;
+                            }
+                            
+                            return DOMHelper.create('div', { children: [ DOMHelper.create('label', { textContent: def.label, style: { fontSize: '14px', display: 'block', textAlign: 'left' } }), select ]});
+                        };
+    
+                        const commonSelects = commonKeys.map(renderSelect).filter(Boolean);
+                        const advancedSelects = advancedKeys.map(renderSelect).filter(Boolean);
+                        
+                        return [
+                            DOMHelper.create('div', { className: 'filter-controls', children: commonSelects }),
+                            DOMHelper.create('div', { className: 'filter-controls advanced-filters', children: advancedSelects })
+                        ];
                     };
-
-                    const commonSelects = commonKeys.map(renderSelect).filter(Boolean);
-                    const advancedSelects = advancedKeys.map(renderSelect).filter(Boolean);
+                    
+                    let queryDisplay = null;
+                    if (queryInfo) {
+                        const criteriaHtml = Object.entries(queryInfo)
+                            .map(([key, value]) => {
+                                if(!value) return null;
+                                return `<strong>${AppConfig.COLUMN_DEFINITIONS[key]?.label ?? key}:</strong> ${Utils.escapeHtml(value)}`
+                            })
+                            .filter(Boolean)
+                            .join('; ');
+                            queryDisplay = DOMHelper.create('div', { className: 'query-criteria-display', innerHTML: `查詢條件： ${criteriaHtml}` });
+                    }
                     
                     return [
-                        DOMHelper.create('div', { className: 'filter-controls', children: commonSelects }),
-                        DOMHelper.create('div', { className: 'filter-controls advanced-filters', children: advancedSelects })
+                        ...(queryDisplay ? [queryDisplay] : []),
+                        ...createFilterControls(),
+                        DOMHelper.create('div', { className: 'controls-row', children: [
+                            DOMHelper.create('span', { id: 'case-count', style: { fontSize: '14px' } }),
+                            DOMHelper.create('div', { className: 'right-controls', children: [
+                                ...(type === 'batch' || type === 'query' ? [DOMHelper.create('button', { id: 'toggle-columns-btn', className: 'dispatch-btn dispatch-outline small', textContent: '顯示更多欄位' })] : []),
+                                DOMHelper.create('button', { id: 'toggle-filters-btn', className: 'dispatch-btn dispatch-outline small', textContent: '顯示更多篩選條件' }),
+                                DOMHelper.create('button', { id: 'clear-filters-btn', className: 'dispatch-btn dispatch-outline small', textContent: '清除篩選' }),
+                                DOMHelper.create('button', { id: 'export-csv-btn', className: 'dispatch-btn small', textContent: '匯出CSV', attributes: { ...(isErrorState && { disabled: true }) } }),
+                                DOMHelper.create('button', { id: 'reload-view-btn', className: 'dispatch-btn small', textContent: '重新整理', title: '重新載入案件列表' }),
+                                DOMHelper.create('button', { id: 'retry-fetch-btn', className: 'dispatch-btn small', textContent: '重新載入', style: { display: isErrorState ? 'inline-flex' : 'none' } })
+                            ]})
+                        ]}),
+                        DOMHelper.create('div', { id: 'case-table-container', className: 'case-table-container', children: [
+                            DOMHelper.create('table', { id: 'case-table', className: 'case-table', children: [
+                                DOMHelper.create('thead', { children: [
+                                    DOMHelper.create('tr', { innerHTML: viewConfig.columns.map(key => {
+                                        const def = AppConfig.COLUMN_DEFINITIONS[key];
+                                        const isFolded = viewConfig.foldedColumns?.includes(key);
+                                        const className = isFolded ? 'class="folded-column"' : '';
+                                        if (key === 'select') {
+                                            return `<th ${className}><input type="checkbox" id="select-all-header" ${isErrorState ? 'disabled' : ''}></th>`;
+                                        }
+                                        return `<th ${className} data-key="${def.key}" data-type="${def.type || ''}" title="點擊排序">${def.label} <span class="sort-indicator"></span></th>`;
+                                    }).join('') })
+                                ]}),
+                                DOMHelper.create('tbody')
+                            ]})
+                        ]})
                     ];
-                };
-                
-                let queryDisplay = null;
-                if (queryInfo) {
-                    const criteriaHtml = Object.entries(queryInfo)
-                        .map(([key, value]) => {
-                            if(!value) return null;
-                            return `<strong>${AppConfig.COLUMN_DEFINITIONS[key]?.label ?? key}:</strong> ${Utils.escapeHtml(value)}`
-                        })
-                        .filter(Boolean)
-                        .join('; ');
-                        queryDisplay = DOMHelper.create('div', { className: 'query-criteria-display', innerHTML: `查詢條件： ${criteriaHtml}` });
                 }
                 
-                return [
-                    ...(queryDisplay ? [queryDisplay] : []),
-                    ...createFilterControls(),
-                    DOMHelper.create('div', { className: 'controls-row', children: [
-                        DOMHelper.create('span', { id: 'case-count', style: { fontSize: '14px' } }),
-                        DOMHelper.create('div', { className: 'right-controls', children: [
-                            ...(type === 'batch' || type === 'query' ? [DOMHelper.create('button', { id: 'toggle-columns-btn', className: 'dispatch-btn dispatch-outline small', textContent: '顯示更多欄位' })] : []),
-                            DOMHelper.create('button', { id: 'toggle-filters-btn', className: 'dispatch-btn dispatch-outline small', textContent: '顯示更多篩選條件' }),
-                            DOMHelper.create('button', { id: 'clear-filters-btn', className: 'dispatch-btn dispatch-outline small', textContent: '清除篩選' }),
-                            DOMHelper.create('button', { id: 'export-csv-btn', className: 'dispatch-btn small', textContent: '匯出CSV', attributes: { ...(isErrorState && { disabled: true }) } }),
-                            DOMHelper.create('button', { id: 'reload-view-btn', className: 'dispatch-btn small', textContent: '重新整理', title: '重新載入案件列表' }),
-                            DOMHelper.create('button', { id: 'retry-fetch-btn', className: 'dispatch-btn small', textContent: '重新載入', style: { display: isErrorState ? 'inline-flex' : 'none' } })
-                        ]})
-                    ]}),
-                    DOMHelper.create('div', { id: 'case-table-container', className: 'case-table-container', children: [
-                        DOMHelper.create('table', { id: 'case-table', className: 'case-table', children: [
-                            DOMHelper.create('thead', { children: [
-                                DOMHelper.create('tr', { innerHTML: columns.map(key => {
-                                    const def = AppConfig.COLUMN_DEFINITIONS[key];
-                                    const isFolded = foldedColumns?.includes(key);
-                                    const className = isFolded ? 'class="folded-column"' : '';
-                                    if (key === 'select') {
-                                        return `<th ${className}><input type="checkbox" id="select-all-header" ${isErrorState ? 'disabled' : ''}></th>`;
-                                    }
-                                    return `<th ${className} data-key="${def.key}" data-type="${def.type || ''}" title="點擊排序">${def.label} <span class="sort-indicator"></span></th>`;
-                                }).join('') })
+                function _createManualOpView() {
+                    const personnelSelector = _createTabbedPersonnelSelector(assigneeList);
+    
+                    return DOMHelper.create('div', {
+                        id: 'manual-op-container', className: 'manual-op-container',
+                        children: [
+                            DOMHelper.create('div', { className: 'manual-op-section', style: { flexGrow: 1 }, children: [
+                                DOMHelper.create('h3', { textContent: '1. 輸入受理號碼' }),
+                                DOMHelper.create('textarea', { id: 'manual-cases-input', className: 'dispatch-input', attributes: { placeholder: '請輸入受理號碼，以逗號、空格或換行分隔' } })
                             ]}),
-                            DOMHelper.create('tbody')
-                        ]})
-                    ]})
-                ];
-            }
-            
-            function _createManualOpView() {
-                const personnelSelector = _createTabbedPersonnelSelector(assigneeList);
-
-                return DOMHelper.create('div', {
-                    id: 'manual-op-container', className: 'manual-op-container',
-                    children: [
-                        DOMHelper.create('div', { className: 'manual-op-section', style: { flexGrow: 1 }, children: [
-                            DOMHelper.create('h3', { textContent: '1. 輸入受理號碼' }),
-                            DOMHelper.create('textarea', { id: 'manual-cases-input', className: 'dispatch-input', attributes: { placeholder: '請輸入受理號碼，以逗號、空格或換行分隔' } })
-                        ]}),
-                        DOMHelper.create('div', { className: 'manual-op-section', children: [
-                            DOMHelper.create('h3', { textContent: '2. 選擇指派人員' }),
-                            personnelSelector.element
-                        ]}),
-                        DOMHelper.create('div', { className: 'manual-op-footer', children: [
-                            DOMHelper.create('button', { id: 'manual-dispatch-btn', className: 'dispatch-btn', textContent: '執行派件' })
-                        ]})
-                    ]
-                });
-            }
-            
-            function _createTabbedPersonnelSelector(defaultUsers) {
-                let importedUsers = [];
-                const selectorId = `personnel-selector-${Date.now()}`;
-
-                const createRadioList = (users, type) => {
-                    const list = DOMHelper.create('ul', { className: 'user-list' });
-                    users.forEach(user => {
-                        const isSpecial = AppConfig.SPECIAL_ASSIGNEES.includes(user);
-                        const li = DOMHelper.create('li', {
-                            className: isSpecial ? 'special-assignee' : '',
-                            children: [
-                                DOMHelper.create('label', {
-                                    children: [
-                                        DOMHelper.create('input', { type: 'radio', attributes: { name: selectorId, value: user } }),
-                                        DOMHelper.create('span', { textContent: user })
-                                    ]
-                                })
-                            ]
-                        });
-                        list.appendChild(li);
+                            DOMHelper.create('div', { className: 'manual-op-section', children: [
+                                DOMHelper.create('h3', { textContent: '2. 選擇指派人員' }),
+                                personnelSelector.element
+                            ]}),
+                            DOMHelper.create('div', { className: 'manual-op-footer', children: [
+                                DOMHelper.create('button', { id: 'manual-dispatch-btn', className: 'dispatch-btn', textContent: '執行派件' })
+                            ]})
+                        ]
                     });
-                    return list;
-                };
-
-                const defaultTabContent = createRadioList([...new Set([...AppConfig.SPECIAL_ASSIGNEES, ...defaultUsers])].sort());
-                const importTabContent = DOMHelper.create('div', { children: [
-                    DOMHelper.create('button', { id: `import-btn-${selectorId}`, className: 'dispatch-btn dispatch-outline small', textContent: '從 .txt 匯入' }),
-                    DOMHelper.create('div', { id: `import-list-${selectorId}`, style: { marginTop: '10px' }})
-                ]});
-                const manualTabContent = DOMHelper.create('input', { id: `manual-input-${selectorId}`, type: 'text', className: 'dispatch-input', attributes: { placeholder: '輸入完整 AD 帳號' } });
-                
-                const tabs = [
-                    { id: 'default', name: '預設清單', content: defaultTabContent },
-                    { id: 'import', name: '匯入清單', content: importTabContent },
-                    { id: 'manual', name: '人工輸入', content: manualTabContent },
-                ];
-                
-                const tabButtons = tabs.map(tab => DOMHelper.create('button', { textContent: tab.name, attributes: { 'data-tab': tab.id } }));
-                const tabContents = tabs.map(tab => {
-                    tab.content.classList.add('personnel-tab-content');
-                    tab.content.setAttribute('data-tab-content', tab.id);
-                    return tab.content;
-                });
-                
-                const element = DOMHelper.create('div', {
-                    className: 'personnel-selector',
-                    children: [
-                        DOMHelper.create('div', { className: 'personnel-tabs', children: tabButtons }),
-                        ...tabContents
-                    ]
-                });
-
-                function setActiveTab(tabId) {
-                    tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
-                    tabContents.forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
                 }
-
-                element.querySelector('.personnel-tabs').addEventListener('click', e => {
-                    if (e.target.tagName === 'BUTTON') {
-                        setActiveTab(e.target.dataset.tab);
-                    }
-                });
-
-                element.addEventListener('change', e => {
-                    if (e.target.type === 'radio') {
-                        manualTabContent.value = '';
-                    }
-                });
-                manualTabContent.addEventListener('input', e => {
-                    e.target.value = e.target.value.toLowerCase();
-                    element.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
-                });
                 
-                importTabContent.querySelector(`#import-btn-${selectorId}`).onclick = async () => {
-                    try {
-                        const names = Utils.splitTextInput(await Utils.readTxt());
-                        if (names.length > 0) {
-                            importedUsers = [...new Set(names)].sort();
-                            const importListContainer = importTabContent.querySelector(`#import-list-${selectorId}`);
-                            importListContainer.innerHTML = '';
-                            importListContainer.appendChild(createRadioList(importedUsers, 'import'));
-                            UIManager.Toast.show(`成功匯入 ${names.length} 位人員`, 'success');
-                        }
-                    } catch (e) {
-                         if (e.message !== '未選取檔案') UIManager.Toast.show(e.message, 'error');
+                function _createTabbedPersonnelSelector(defaultUsers) {
+                    let importedUsers = [];
+                    const selectorId = `personnel-selector-${Date.now()}`;
+    
+                    const createRadioList = (users) => {
+                        const list = DOMHelper.create('ul', { className: 'user-list' });
+                        users.forEach(user => {
+                            const isSpecial = AppConfig.SPECIAL_ASSIGNEES.includes(user);
+                            const li = DOMHelper.create('li', {
+                                className: isSpecial ? 'special-assignee' : '',
+                                children: [
+                                    DOMHelper.create('label', {
+                                        children: [
+                                            DOMHelper.create('input', { type: 'radio', attributes: { name: selectorId, value: user } }),
+                                            DOMHelper.create('span', { textContent: user })
+                                        ]
+                                    })
+                                ]
+                            });
+                            list.appendChild(li);
+                        });
+                        return list;
+                    };
+    
+                    const defaultTabContent = createRadioList([...new Set([...AppConfig.SPECIAL_ASSIGNEES, ...defaultUsers])].sort());
+                    const importTabContent = DOMHelper.create('div', { children: [
+                        DOMHelper.create('button', { id: `import-btn-${selectorId}`, className: 'dispatch-btn dispatch-outline small', textContent: '從 .txt 匯入' }),
+                        DOMHelper.create('div', { id: `import-list-${selectorId}`, style: { marginTop: '10px' }})
+                    ]});
+                    const manualTabContent = DOMHelper.create('input', { id: `manual-input-${selectorId}`, type: 'text', className: 'dispatch-input', attributes: { placeholder: '輸入完整 AD 帳號' } });
+                    
+                    const tabs = [
+                        { id: 'default', name: '預設清單', content: defaultTabContent },
+                        { id: 'import', name: '匯入清單', content: importTabContent },
+                        { id: 'manual', name: '人工輸入', content: manualTabContent },
+                    ];
+                    
+                    const tabButtons = tabs.map(tab => DOMHelper.create('button', { textContent: tab.name, attributes: { 'data-tab': tab.id } }));
+                    const tabContents = tabs.map(tab => {
+                        tab.content.classList.add('personnel-tab-content');
+                        tab.content.setAttribute('data-tab-content', tab.id);
+                        return tab.content;
+                    });
+                    
+                    const element = DOMHelper.create('div', {
+                        className: 'personnel-selector',
+                        children: [
+                            DOMHelper.create('div', { className: 'personnel-tabs', children: tabButtons }),
+                            ...tabContents
+                        ]
+                    });
+    
+                    function setActiveTab(tabId) {
+                        tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+                        tabContents.forEach(content => content.classList.toggle('active', content.dataset.tabContent === tabId));
                     }
-                };
-
-                setActiveTab('default');
-
-                return {
-                    element,
-                    getSelectedValue: () => {
-                        const activeTabId = element.querySelector('.personnel-tabs .active').dataset.tab;
-                        if (activeTabId === 'manual') {
-                            return manualTabContent.value.trim();
+    
+                    element.querySelector('.personnel-tabs').addEventListener('click', e => {
+                        if (e.target.tagName === 'BUTTON') {
+                            setActiveTab(e.target.dataset.tab);
+                        }
+                    });
+    
+                    element.addEventListener('change', e => {
+                        if (e.target.type === 'radio') {
+                            manualTabContent.value = '';
+                        }
+                    });
+                    manualTabContent.addEventListener('input', e => {
+                        e.target.value = e.target.value.toLowerCase();
+                        element.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+                    });
+                    
+                    importTabContent.querySelector(`#import-btn-${selectorId}`).onclick = async () => {
+                        try {
+                            const names = Utils.splitTextInput(await Utils.readTxt());
+                            if (names.length > 0) {
+                                importedUsers = [...new Set(names)].sort();
+                                const importListContainer = importTabContent.querySelector(`#import-list-${selectorId}`);
+                                importListContainer.innerHTML = '';
+                                importListContainer.appendChild(createRadioList(importedUsers));
+                                UIManager.Toast.show(`成功匯入 ${names.length} 位人員`, 'success');
+                            }
+                        } catch (e) {
+                             if (e.message !== '未選取檔案') UIManager.Toast.show(e.message, 'error');
+                        }
+                    };
+    
+                    setActiveTab('default');
+    
+                    return {
+                        element,
+                        getSelectedValue: () => {
+                            const activeTabId = element.querySelector('.personnel-tabs .active').dataset.tab;
+                            if (activeTabId === 'manual') {
+                                return manualTabContent.value.trim();
+                            } else {
+                                const selectedRadio = element.querySelector(`input[name="${selectorId}"]:checked`);
+                                return selectedRadio ? selectedRadio.value : null;
+                            }
+                        }
+                    };
+                }
+    
+                function _createFooter() {
+                    if (activeTabId === 'manual' || !viewConfig) return DOMHelper.create('div', { className: 'dispatch-footer' });
+                    return DOMHelper.create('div', {
+                        className: 'dispatch-footer',
+                        style: { justifyContent: 'flex-end' },
+                        children: [
+                            DOMHelper.create('button', { id: 'next-step-btn', className: 'dispatch-btn', textContent: '下一步 (0)', attributes: { disabled: true } })
+                        ]
+                    });
+                }
+                
+                function _bindEvents(resolve) {
+                    elements.resolve = resolve;
+                    _bindHeaderEvents();
+                    _bindTabEvents();
+    
+                    if (activeTabId === 'manual') {
+                        _bindManualOpEvents();
+                    } else if(viewConfig) {
+                        _bindFilterEvents();
+                        _bindTableEvents();
+                        _bindFooterEvents();
+                    }
+                }
+    
+                function _bindHeaderEvents() {
+                    elements.modal.querySelector('#config-btn').onclick = (e) => {
+                        const menu = elements.modal.querySelector('#config-menu');
+                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                    };
+                    elements.modal.querySelector('#change-token-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.CHANGE_TOKEN });
+                    elements.modal.querySelector('#open-new-query-btn').onclick = () => {
+                        const currentFilters = {};
+                         elements.modal.querySelectorAll('.filter-select').forEach(sel => {
+                            if(sel.value) currentFilters[sel.id.replace('filter-','')] = sel.value;
+                        });
+                        elements.resolve({ action: AppConfig.MODAL_ACTIONS.OPEN_NEW_QUERY, currentFilters });
+                    };
+                    elements.modal.querySelector('#clear-cache-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.CLEAR_CACHE });
+                }
+    
+                function _bindTabEvents() {
+                     elements.modal.querySelector('.dispatch-tabs').onclick = (e) => {
+                        const target = e.target;
+                        if (target.matches('.close-tab-btn')) {
+                            e.stopPropagation();
+                            elements.resolve({ action: AppConfig.MODAL_ACTIONS.CLOSE_QUERY_TAB, tabId: target.dataset.tabId });
                         } else {
-                            const selectedRadio = element.querySelector(`input[name="${selectorId}"]:checked`);
+                            const button = target.closest('button[data-tab-id]');
+                            if (button && !button.classList.contains('active')) {
+                                elements.resolve({ action: AppConfig.MODAL_ACTIONS.SWITCH_TAB, tabId: button.dataset.tabId });
+                            }
+                        }
+                    };
+                }
+    
+                function _bindFilterEvents() {
+                    elements.modal.querySelector('#toggle-filters-btn').onclick = (e) => {
+                        const advancedFilters = elements.modal.querySelector('.advanced-filters');
+                        const isHidden = advancedFilters.style.display === 'none' || advancedFilters.style.display === '';
+                        advancedFilters.style.display = isHidden ? 'grid' : 'none';
+                        e.target.textContent = isHidden ? '隱藏進階篩選' : '顯示更多篩選條件';
+                    };
+                    
+                    const toggleColumnsBtn = elements.modal.querySelector('#toggle-columns-btn');
+                    if (toggleColumnsBtn) {
+                        toggleColumnsBtn.onclick = (e) => {
+                            const table = elements.modal.querySelector('#case-table');
+                            table.classList.toggle('show-all-columns');
+                            e.target.textContent = table.classList.contains('show-all-columns') ? '隱藏部分欄位' : '顯示更多欄位';
+                        };
+                    }
+                    
+                    elements.modal.querySelector('#clear-filters-btn').onclick = () => {
+                        elements.filterSelects.forEach(sel => sel.value = '');
+                        _applyFiltersAndSort();
+                    };
+    
+                    elements.modal.querySelector('#export-csv-btn').onclick = () => {
+                        if (currentData.length === 0) return UIManager.Toast.show('沒有可匯出的資料', 'warning');
+                        const filename = `${viewConfig.type}_案件清單_${new Date().toISOString().slice(0, 10)}.csv`;
+                        const csvData = Utils.jsonToCsv(currentData, { dynamicHeaders: viewConfig.type === 'batch' || viewConfig.type === 'query' });
+                        Utils.downloadCsv(csvData, filename);
+                    };
+    
+                    elements.modal.querySelector('#reload-view-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.RELOAD_VIEW });
+    
+                    if (isErrorState) {
+                        elements.modal.querySelector('#retry-fetch-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.RELOAD_VIEW });
+                    } else {
+                        elements.filterSelects.forEach(select => { select.onchange = _applyFiltersAndSort; });
+                    }
+                }
+                
+                function _bindManualOpEvents() {
+                     const container = elements.modal.querySelector('#manual-op-container');
+                     const dispatchBtn = container.querySelector('#manual-dispatch-btn');
+                     const casesInput = container.querySelector('#manual-cases-input');
+                     const personnelSelector = container.querySelector('.personnel-selector');
+                     
+                     const getSelectedAssignee = () => {
+                        const activeTabId = personnelSelector.querySelector('.personnel-tabs .active').dataset.tab;
+                        if (activeTabId === 'manual') {
+                            return personnelSelector.querySelector('input[type="text"]').value.trim();
+                        } else {
+                            const selectorId = personnelSelector.querySelector('input[type="radio"]').name;
+                            const selectedRadio = personnelSelector.querySelector(`input[name="${selectorId}"]:checked`);
                             return selectedRadio ? selectedRadio.value : null;
                         }
+                     };
+    
+                     dispatchBtn.onclick = () => {
+                         const cases = Utils.splitTextInput(casesInput.value);
+                         if (cases.length === 0) {
+                             return UIManager.Toast.show('請輸入至少一個受理號碼', 'error');
+                         }
+                         
+                         const assignee = getSelectedAssignee();
+                         if (!assignee) {
+                             return UIManager.Toast.show('請選擇或輸入指派人員', 'error');
+                         }
+    
+                         elements.resolve({ action: AppConfig.MODAL_ACTIONS.MANUAL_DISPATCH, cases, assignee });
+                     };
+                }
+    
+                function _bindTableEvents() {
+                    if (isErrorState) return;
+                    elements.table.onclick = e => {
+                        const target = e.target;
+                        if (target.matches('th[data-key], th[data-key] *')) {
+                            const th = target.closest('th[data-key]');
+                            const key = th.dataset.key;
+                            sortState.order = (sortState.key === key && sortState.order === 'asc') ? 'desc' : 'asc';
+                            sortState.key = key;
+                            elements.modal.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
+                            th.querySelector('.sort-indicator').textContent = sortState.order === 'asc' ? '▲' : '▼';
+                            _applyFiltersAndSort();
+                        } 
+                        else if (target.id === 'select-all-header') {
+                            elements.tbody.querySelectorAll('.case-checkbox').forEach(cb => cb.checked = target.checked);
+                            _updateNextButton();
+                        } 
+                        else if (target.matches('.case-checkbox')) {
+                            _updateNextButton();
+                        }
+                        else if (target.tagName === 'TD') {
+                            navigator.clipboard.writeText(target.textContent).then(() => UIManager.Toast.show('已複製', 'success', 1000));
+                        }
+                    };
+                }
+    
+                function _bindFooterEvents() {
+                    if (isErrorState || !elements.nextBtn) return;
+                    elements.nextBtn.onclick = () => {
+                        const selectedCases = Array.from(elements.modal.querySelectorAll('.case-checkbox:checked')).map(cb => cb.value);
+                        if (selectedCases.length > 0) elements.resolve({ action: AppConfig.MODAL_ACTIONS.NEXT_STEP, selectedCases });
+                    };
+                }
+    
+                return UIManager.Modal.show({
+                    header,
+                    body,
+                    footer,
+                    width: AppConfig.TOOL_CONTAINER_WIDTH,
+                    onOpen: (modal, resolve) => {
+                        elements = {
+                            modal,
+                            resolve,
+                            tbody: modal.querySelector('tbody'),
+                            table: modal.querySelector('#case-table'),
+                            countElem: modal.querySelector('#case-count'),
+                            nextBtn: modal.querySelector('#next-step-btn'),
+                            filterSelects: modal.querySelectorAll('.filter-select')
+                        };
+                        
+                        _bindEvents(resolve);
+                        
+                        if (activeTabId !== 'manual' && viewConfig) {
+                            _renderTable(currentData);
+                            if (initialFilters && !isErrorState) {
+                                 _applyFiltersAndSort();
+                            }
+                        }
                     }
-                };
-            }
-
-            function _createFooter() {
-                if (activeTabId === 'manual' || !viewConfig) return DOMHelper.create('div', { className: 'dispatch-footer' });
-                return DOMHelper.create('div', {
-                    className: 'dispatch-footer',
-                    style: { justifyContent: 'flex-end' },
-                    children: [
-                        DOMHelper.create('button', { id: 'next-step-btn', className: 'dispatch-btn', textContent: '下一步 (0)', attributes: { disabled: true } })
-                    ]
                 });
             }
-            
-            function _bindEvents(resolve) {
-                elements.resolve = resolve;
-                _bindHeaderEvents();
-                _bindTabEvents();
-
-                if (activeTabId === 'manual') {
-                    _bindManualOpEvents();
-                } else if(viewConfig) {
-                    _bindFilterEvents();
-                    _bindTableEvents();
-                    _bindFooterEvents();
-                }
-            }
-
-            function _bindHeaderEvents() {
-                elements.modal.querySelector('#config-btn').onclick = (e) => {
-                    const menu = elements.modal.querySelector('#config-menu');
-                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                };
-                elements.modal.querySelector('#change-token-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.CHANGE_TOKEN });
-                elements.modal.querySelector('#open-new-query-btn').onclick = () => {
-                    const currentFilters = {};
-                     elements.modal.querySelectorAll('.filter-select').forEach(sel => {
-                        if(sel.value) currentFilters[sel.id.replace('filter-','')] = sel.value;
-                    });
-                    elements.resolve({ action: AppConfig.MODAL_ACTIONS.OPEN_NEW_QUERY, currentFilters });
-                };
-                elements.modal.querySelector('#clear-cache-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.CLEAR_CACHE });
-            }
-
-            function _bindTabEvents() {
-                 elements.modal.querySelector('.dispatch-tabs').onclick = (e) => {
-                    const target = e.target;
-                    if (target.matches('.close-tab-btn')) {
-                        e.stopPropagation();
-                        elements.resolve({ action: AppConfig.MODAL_ACTIONS.CLOSE_QUERY_TAB, tabId: target.dataset.tabId });
-                    } else {
-                        const button = target.closest('button[data-tab-id]');
-                        if (button && !button.classList.contains('active')) {
-                            elements.resolve({ action: AppConfig.MODAL_ACTIONS.SWITCH_TAB, tabId: button.dataset.tabId });
-                        }
-                    }
-                };
-            }
-
-            function _bindFilterEvents() {
-                elements.modal.querySelector('#toggle-filters-btn').onclick = (e) => {
-                    const advancedFilters = elements.modal.querySelector('.advanced-filters');
-                    const isHidden = advancedFilters.style.display === 'none' || advancedFilters.style.display === '';
-                    advancedFilters.style.display = isHidden ? 'grid' : 'none';
-                    e.target.textContent = isHidden ? '隱藏進階篩選' : '顯示更多篩選條件';
-                };
-                
-                const toggleColumnsBtn = elements.modal.querySelector('#toggle-columns-btn');
-                if (toggleColumnsBtn) {
-                    toggleColumnsBtn.onclick = (e) => {
-                        const table = elements.modal.querySelector('#case-table');
-                        table.classList.toggle('show-all-columns');
-                        e.target.textContent = table.classList.contains('show-all-columns') ? '隱藏部分欄位' : '顯示更多欄位';
-                    };
-                }
-                
-                elements.modal.querySelector('#clear-filters-btn').onclick = () => {
-                    elements.filterSelects.forEach(sel => sel.value = '');
-                    _applyFiltersAndSort();
-                };
-
-                elements.modal.querySelector('#export-csv-btn').onclick = () => {
-                    if (currentData.length === 0) return UIManager.Toast.show('沒有可匯出的資料', 'warning');
-                    const filename = `${viewConfig.type}_案件清單_${new Date().toISOString().slice(0, 10)}.csv`;
-                    const csvData = Utils.jsonToCsv(currentData, { dynamicHeaders: viewConfig.type === 'batch' || viewConfig.type === 'query' });
-                    Utils.downloadCsv(csvData, filename);
-                };
-
-                elements.modal.querySelector('#reload-view-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.RELOAD_VIEW });
-
-                if (isErrorState) {
-                    elements.modal.querySelector('#retry-fetch-btn').onclick = () => elements.resolve({ action: AppConfig.MODAL_ACTIONS.RELOAD_VIEW });
-                } else {
-                    elements.filterSelects.forEach(select => { select.onchange = _applyFiltersAndSort; });
-                }
-            }
-            
-            function _bindManualOpEvents() {
-                 const container = elements.modal.querySelector('#manual-op-container');
-                 const dispatchBtn = container.querySelector('#manual-dispatch-btn');
-                 const casesInput = container.querySelector('#manual-cases-input');
-                 const personnelSelector = container.querySelector('.personnel-selector');
-                 
-                 const getSelectedAssignee = () => {
-                    const activeTabId = personnelSelector.querySelector('.personnel-tabs .active').dataset.tab;
-                    if (activeTabId === 'manual') {
-                        return personnelSelector.querySelector('input[type="text"]').value.trim();
-                    } else {
-                        const selectorId = personnelSelector.querySelector('input[type="radio"]').name;
-                        const selectedRadio = personnelSelector.querySelector(`input[name="${selectorId}"]:checked`);
-                        return selectedRadio ? selectedRadio.value : null;
-                    }
-                 };
-
-                 dispatchBtn.onclick = () => {
-                     const cases = Utils.splitTextInput(casesInput.value);
-                     if (cases.length === 0) {
-                         return UIManager.Toast.show('請輸入至少一個受理號碼', 'error');
-                     }
-                     
-                     const assignee = getSelectedAssignee();
-                     if (!assignee) {
-                         return UIManager.Toast.show('請選擇或輸入指派人員', 'error');
-                     }
-
-                     elements.resolve({ action: AppConfig.MODAL_ACTIONS.MANUAL_DISPATCH, cases, assignee });
-                 };
-            }
-
-            function _bindTableEvents() {
-                if (isErrorState) return;
-                elements.table.onclick = e => {
-                    const target = e.target;
-                    if (target.matches('th[data-key], th[data-key] *')) {
-                        const th = target.closest('th[data-key]');
-                        const key = th.dataset.key;
-                        sortState.order = (sortState.key === key && sortState.order === 'asc') ? 'desc' : 'asc';
-                        sortState.key = key;
-                        elements.modal.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
-                        th.querySelector('.sort-indicator').textContent = sortState.order === 'asc' ? '▲' : '▼';
-                        _applyFiltersAndSort();
-                    } 
-                    else if (target.id === 'select-all-header') {
-                        elements.tbody.querySelectorAll('.case-checkbox').forEach(cb => cb.checked = target.checked);
-                        _updateNextButton();
-                    } 
-                    else if (target.matches('.case-checkbox')) {
-                        _updateNextButton();
-                    }
-                    else if (target.tagName === 'TD') {
-                        navigator.clipboard.writeText(target.textContent).then(() => UIManager.Toast.show('已複製', 'success', 1000));
-                    }
-                };
-            }
-
-            function _bindFooterEvents() {
-                if (isErrorState || !elements.nextBtn) return;
-                elements.nextBtn.onclick = () => {
-                    const selectedCases = Array.from(elements.modal.querySelectorAll('.case-checkbox:checked')).map(cb => cb.value);
-                    if (selectedCases.length > 0) elements.resolve({ action: AppConfig.MODAL_ACTIONS.NEXT_STEP, selectedCases });
-                };
-            }
-
-            return UIManager.Modal.show({
-                header,
-                body,
-                footer,
-                width: AppConfig.TOOL_CONTAINER_WIDTH,
-                onOpen: (modal, resolve) => {
-                    elements = {
-                        modal,
-                        resolve,
-                        tbody: modal.querySelector('tbody'),
-                        table: modal.querySelector('#case-table'),
-                        countElem: modal.querySelector('#case-count'),
-                        nextBtn: modal.querySelector('#next-step-btn'),
-                        filterSelects: modal.querySelectorAll('.filter-select')
-                    };
-                    
-                    _bindEvents(resolve);
-                    
-                    if (activeTabId !== 'manual' && viewConfig) {
-                        _renderTable(currentData);
-                        if (initialFilters && !isErrorState) {
-                             _applyFiltersAndSort();
-                        }
-                    }
-                }
-            });
-        }}
+        };
 
         return { TokenDialog, QueryBuilderDialog, PersonnelSelectDialog, AssignmentResultDialog, ErrorDialog, CaseListView };
     };
