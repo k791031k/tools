@@ -1,13 +1,14 @@
 javascript: (() => {
     /**
      * =================================================================================
-     * 案件清單作業 - v0808v1
+     * 案件清單作業 - v0808v2 (穩定性修正版)
      * =================================================================================
-     * @version     0808v1
+     * @version     0808v2
      * @description
-     * [功能調整] 依需求移除「送件單位代碼」與「最後編輯時間」的篩選/查詢功能，但保留其在列表中的顯示。
-     * [介面重構] 「人工執行」頁籤更名為「手動派件」，並採用全新的「牌卡式按鈕」介面選擇派件人員，優化操作流程。
-     * [樣式修正] 修正了查詢頁籤關閉按鈕(x)的樣式，改為滑鼠懸停時顯示，解決了原先的版面問題並提升使用者體驗。
+     * [穩定性修復] 徹底修復了因「手動派件」頁籤邏輯重構引入的變數範圍與遞迴呼叫錯誤，解決了啟動後閃退的問題。
+     * [功能調整] 確認移除「送件單位代碼」與「最後編輯時間」的篩選/查詢功能，但保留其在列表中的顯示。
+     * [介面重構] 「手動派件」頁籤採用全新的「牌卡式按鈕」介面選擇派件人員。
+     * [樣式修正] 修正了查詢頁籤關閉按鈕的樣式，改為滑鼠懸停時顯示。
      * =================================================================================
      */
     'use strict';
@@ -21,7 +22,7 @@ javascript: (() => {
     // === 1. 設定模組 (AppConfig) ===
     const AppConfig = (() => {
         const staticConfig = {
-            VERSION: '0808v1',
+            VERSION: '0808v2',
             TOOL_CONTAINER_ID: 'dispatch-tool-container-v15',
             STYLE_ELEMENT_ID: 'dispatch-tool-style-v15',
             TOKEN_KEY: 'euisToken',
@@ -1015,7 +1016,8 @@ javascript: (() => {
             }
             
             const caseListViewShow = (viewOpts) => {
-                const { tabs, activeTabId, caseList, error, viewConfig, filterOptions, initialFilters, assigneeList, queryInfo } = viewOpts;
+                const { tabs, activeTabId, caseList, error, viewConfig, filterOptions, initialFilters, queryInfo } = viewOpts;
+                let { assigneeList } = viewOpts;
                 const isErrorState = !!error;
                 let sortState = { key: null, order: 'asc' };
                 let currentData = isErrorState ? [] : [...caseList];
@@ -1024,16 +1026,16 @@ javascript: (() => {
                 function _renderTable(data) {
                     if (isErrorState) {
                         elements.tbody.innerHTML = '';
-                        const errorLink = DOMHelper.create('a', {
+                        const errorLink = domHelper.create('a', {
                             textContent: '點此重新驗證 Token',
                             attributes: { href: '#' },
                             style: { color: 'var(--error-color)', textDecoration: 'underline' },
                             events: { click: (e) => { e.preventDefault(); elements.resolve({ action: appConfig.MODAL_ACTIONS.CHANGE_TOKEN }); }}
                         });
-                        elements.tbody.appendChild(DOMHelper.create('tr', { children: [DOMHelper.create('td', {
+                        elements.tbody.appendChild(domHelper.create('tr', { children: [domHelper.create('td', {
                             attributes: { colspan: viewConfig.columns.length },
                             style: { color: 'var(--error-color)', fontWeight: 'bold', height: '100px' },
-                            children: [DOMHelper.create('span', { textContent: `資料載入失敗：${utils.escapeHtml(error.message)} ` }), errorLink]
+                            children: [domHelper.create('span', { textContent: `資料載入失敗：${utils.escapeHtml(error.message)} ` }), errorLink]
                         })] }));
                         elements.countElem.textContent = '載入失敗';
                         if (elements.nextBtn) elements.nextBtn.disabled = true;
@@ -1104,28 +1106,28 @@ javascript: (() => {
                             <button data-action="${appConfig.MODAL_ACTIONS.CLEAR_CACHE}">清除查詢頁籤</button>
                         </div>`;
                 }
+
+                function _createPersonnelRadioList(assignees, radioName) {
+                    const uniqueAssignees = [...new Set(assignees)];
+                    const special = uniqueAssignees.filter(a => appConfig.SPECIAL_ASSIGNEES.includes(a)).sort();
+                    const regular = uniqueAssignees.filter(a => !appConfig.SPECIAL_ASSIGNEES.includes(a)).sort();
+                    const sortedList = [...special, ...regular];
+                    
+                    const listContainer = domHelper.create('ul', { className: 'personnel-radio-list' });
+                    sortedList.forEach(assignee => {
+                        const isSpecial = appConfig.SPECIAL_ASSIGNEES.includes(assignee);
+                        const label = domHelper.create('label', { className: isSpecial ? 'special-assignee' : '', children: [
+                            domHelper.create('input', { type: 'radio', attributes: { name: radioName, value: assignee } }),
+                            document.createTextNode(` ${assignee}`)
+                        ]});
+                        listContainer.appendChild(domHelper.create('li', { children: [label] }));
+                    });
+                    return listContainer;
+                };
                 
                 function _createManualOpView() {
-                    const createPersonnelRadioList = (assignees) => {
-                        const uniqueAssignees = [...new Set(assignees)];
-                        const special = uniqueAssignees.filter(a => appConfig.SPECIAL_ASSIGNEES.includes(a)).sort();
-                        const regular = uniqueAssignees.filter(a => !appConfig.SPECIAL_ASSIGNEES.includes(a)).sort();
-                        const sortedList = [...special, ...regular];
-                        
-                        const listContainer = domHelper.create('ul', { className: 'personnel-radio-list' });
-                        sortedList.forEach(assignee => {
-                            const isSpecial = appConfig.SPECIAL_ASSIGNEES.includes(assignee);
-                            const label = domHelper.create('label', { className: isSpecial ? 'special-assignee' : '', children: [
-                                domHelper.create('input', { type: 'radio', attributes: { name: 'manual_assignee_radio', value: assignee } }),
-                                document.createTextNode(` ${assignee}`)
-                            ]});
-                            listContainer.appendChild(domHelper.create('li', { children: [label] }));
-                        });
-                        return listContainer;
-                    };
-                    
                     const defaultPane = domHelper.create('div', { className: 'personnel-selector-pane active', attributes: {'data-pane': 'default'} });
-                    defaultPane.appendChild(createPersonnelRadioList(state.assigneeList));
+                    defaultPane.appendChild(_createPersonnelRadioList(assigneeList, 'manual_assignee_radio'));
 
                     const importPane = domHelper.create('div', { className: 'personnel-selector-pane', attributes: {'data-pane': 'import'} });
                     const importListContainer = domHelper.create('div', { id: 'manual-import-list-container', style: { flexGrow: 1, marginTop: '10px' }});
@@ -1315,10 +1317,15 @@ javascript: (() => {
                              try {
                                 const names = utils.splitTextInput(await utils.readTxt());
                                 if(names.length > 0) {
-                                    state.assigneeList = [...new Set([...state.assigneeList, ...names])];
+                                    assigneeList = [...new Set([...assigneeList, ...names])];
                                     const importListContainer = container.querySelector('#manual-import-list-container');
                                     importListContainer.innerHTML = '';
-                                    importListContainer.appendChild(createPersonnelRadioList(names));
+                                    importListContainer.appendChild(_createPersonnelRadioList(names, 'manual_assignee_radio'));
+                                    
+                                    const defaultPane = container.querySelector('[data-pane="default"]');
+                                    defaultPane.innerHTML = '';
+                                    defaultPane.appendChild(_createPersonnelRadioList(assigneeList, 'manual_assignee_radio'));
+
                                     uiManager.Toast.show(`成功匯入 ${names.length} 位人員`, 'success');
                                 }
                              } catch(e) {
@@ -1390,9 +1397,10 @@ javascript: (() => {
                             const activePane = elements.modal.querySelector('.personnel-selector-pane.active');
                             let assignee = null;
                             if(activePane){
-                                if (activePane.getAttribute('data-pane') === 'manual') {
+                                const paneType = activePane.getAttribute('data-pane');
+                                if (paneType === 'manual') {
                                     assignee = activePane.querySelector('input[type=text]').value.trim();
-                                } else {
+                                } else { // default or import
                                     const selectedRadio = activePane.querySelector('input[type=radio]:checked');
                                     if(selectedRadio) assignee = selectedRadio.value;
                                 }
@@ -1565,11 +1573,10 @@ javascript: (() => {
      */
     try {
         const utils = createUtils(AppConfig);
-        const domHelper = DOMHelper; 
         const appState = AppState;
-        const uiManager = createUIManager(AppConfig, appState, utils, domHelper);
+        const uiManager = createUIManager(AppConfig, appState, utils, DOMHelper);
         const apiService = createApiService(AppConfig, appState, uiManager);
-        const uiComponents = createUIComponents(AppConfig, uiManager, utils, domHelper);
+        const uiComponents = createUIComponents(AppConfig, uiManager, utils, DOMHelper);
         const app = createAppRunner(AppConfig, appState, apiService, uiComponents, utils, uiManager);
         app.run();
     } catch (e) {
