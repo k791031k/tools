@@ -1,14 +1,11 @@
 javascript: (() => {
     /**
      * =================================================================================
-     * 案件清單作業 - v0808v2 (穩定性修正版)
+     * 案件清單作業 - v0808v3 (穩定性修正版)
      * =================================================================================
-     * @version     0808v2
+     * @version     0808v3
      * @description
-     * [穩定性修復] 徹底修復了因「手動派件」頁籤邏輯重構引入的變數範圍與遞迴呼叫錯誤，解決了啟動後閃退的問題。
-     * [功能調整] 確認移除「送件單位代碼」與「最後編輯時間」的篩選/查詢功能，但保留其在列表中的顯示。
-     * [介面重構] 「手動派件」頁籤採用全新的「牌卡式按鈕」介面選擇派件人員。
-     * [樣式修正] 修正了查詢頁籤關閉按鈕的樣式，改為滑鼠懸停時顯示。
+     * [致命錯誤修復] 修正了因變數傳遞遺漏導致程式啟動時立即崩潰的嚴重錯誤 (ReferenceError: domHelper is not defined)。
      * =================================================================================
      */
     'use strict';
@@ -22,7 +19,7 @@ javascript: (() => {
     // === 1. 設定模組 (AppConfig) ===
     const AppConfig = (() => {
         const staticConfig = {
-            VERSION: '0808v2',
+            VERSION: '0808v3',
             TOOL_CONTAINER_ID: 'dispatch-tool-container-v15',
             STYLE_ELEMENT_ID: 'dispatch-tool-style-v15',
             TOKEN_KEY: 'euisToken',
@@ -248,7 +245,9 @@ javascript: (() => {
                 }
             }
             if (options.children) {
-                options.children.forEach(child => el.appendChild(child));
+                options.children.forEach(child => {
+                    if (child) el.appendChild(child);
+                });
             }
             if (options.events) {
                 for (const [event, handler] of Object.entries(options.events)) {
@@ -903,13 +902,11 @@ javascript: (() => {
             }
         };
         
-        const CaseListView = {};
-
-        return { TokenDialog, QueryBuilderDialog, PersonnelSelectDialog, AssignmentResultDialog, ErrorDialog, CaseListView };
+        return { TokenDialog, QueryBuilderDialog, PersonnelSelectDialog, AssignmentResultDialog, ErrorDialog };
     };
 
     // === 7. 主程式執行器 (AppRunner) ===
-    const createAppRunner = (appConfig, appState, apiService, uiComponents, utils, uiManager) => {
+    const createAppRunner = (appConfig, appState, apiService, uiComponents, utils, uiManager, domHelper) => {
         const state = {
             personalCases: null,
             batchCases: null,
@@ -1106,7 +1103,7 @@ javascript: (() => {
                             <button data-action="${appConfig.MODAL_ACTIONS.CLEAR_CACHE}">清除查詢頁籤</button>
                         </div>`;
                 }
-
+                
                 function _createPersonnelRadioList(assignees, radioName) {
                     const uniqueAssignees = [...new Set(assignees)];
                     const special = uniqueAssignees.filter(a => appConfig.SPECIAL_ASSIGNEES.includes(a)).sort();
@@ -1573,11 +1570,12 @@ javascript: (() => {
      */
     try {
         const utils = createUtils(AppConfig);
+        const domHelper = DOMHelper; 
         const appState = AppState;
-        const uiManager = createUIManager(AppConfig, appState, utils, DOMHelper);
+        const uiManager = createUIManager(AppConfig, appState, utils, domHelper);
         const apiService = createApiService(AppConfig, appState, uiManager);
-        const uiComponents = createUIComponents(AppConfig, uiManager, utils, DOMHelper);
-        const app = createAppRunner(AppConfig, appState, apiService, uiComponents, utils, uiManager);
+        const uiComponents = createUIComponents(AppConfig, uiManager, utils, domHelper);
+        const app = createAppRunner(AppConfig, appState, apiService, uiComponents, utils, uiManager, domHelper);
         app.run();
     } catch (e) {
         console.error('案件清單作業 - 致命錯誤:', e);
