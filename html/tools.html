@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>離線萬用工具箱 - 完整版 (已修復)</title>
+    <!-- 使用 Tailwind CSS 快速建置響應式介面 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .nav-btn.active {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #374151; /* gray-700 */
+        }
+        .nav-btn:not(.active) {
+            color: #6b7280; /* gray-500 */
+        }
+        .nav-btn:not(.active):hover {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .draggable { cursor: grab; }
+        .draggable:active { cursor: grabbing; }
+        .table-cell-input {
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            padding: 4px;
+            box-sizing: border-box;
+            background-color: #f9fafb;
+        }
+    </style>
+    <!-- highlight.js for code highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+</head>
+<body class="bg-gray-100 flex flex-col md:flex-row h-screen overflow-hidden">
+
+    <!-- 左側導覽列 -->
+    <aside class="bg-white w-full md:w-64 flex-shrink-0 p-4 border-r border-gray-200 overflow-y-auto">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">萬用工具箱</h1>
+        <div id="tool-nav" class="space-y-2">
+            <!-- 檔案處理 -->
+            <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4">檔案處理</h2>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-converter"><i class="fas fa-file-pdf mr-2"></i>PDF 轉圖片</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-merger"><i class="fas fa-object-ungroup mr-2"></i>PDF 合併</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-splitter"><i class="fas fa-cut mr-2"></i>PDF 分割</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-encryptor"><i class="fas fa-lock mr-2"></i>PDF 加密</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-signer"><i class="fas fa-signature mr-2"></i>PDF 新增簽名</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="pdf-add-text"><i class="fas fa-pencil-alt mr-2"></i>PDF 新增文字</button>
+
+            <!-- 網頁開發工具 -->
+            <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4">網頁開發工具</h2>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="code-previewer"><i class="fas fa-laptop-code mr-2"></i>程式碼預覽器</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="char-code"><i class="fas fa-font mr-2"></i>字碼查詢</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="regex-tester"><i class="fas fa-search-plus mr-2"></i>正則表達式</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="encoder-decoder"><i class="fas fa-code mr-2"></i>編碼/解碼器</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="web-editor"><i class="fas fa-edit mr-2"></i>網頁編輯</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="json-tools"><i class="fas fa-sitemap mr-2"></i>JSON 工具集</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="code-formatter"><i class="fas fa-code mr-2"></i>程式碼格式化</button>
+            
+            <!-- 日常實用工具 -->
+            <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-4">日常實用工具</h2>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="text-tools"><i class="fas fa-sort-alpha-down mr-2"></i>文本編輯與排序</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="color-tools"><i class="fas fa-palette mr-2"></i>顏色工具</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="id-generator"><i class="fas fa-id-card mr-2"></i>身分證產生器</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="age-calculator"><i class="fas fa-calendar-alt mr-2"></i>保險年齡計算</button>
+            <button class="nav-btn w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200" data-target="qr-code-generator"><i class="fas fa-qrcode mr-2"></i>QR Code 產生器</button>
+        </div>
+    </aside>
+
+    <!-- 右側主要內容區 -->
+    <main class="flex-grow p-8 bg-gray-50 overflow-y-auto">
+        <div id="tool-container" class="space-y-8">
+            <!-- 載入中的訊息 -->
+            <div id="loading" class="flex justify-center items-center h-full">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
+                    <p class="mt-4 text-gray-600">正在載入工具...請稍候。</p>
+                </div>
+            </div>
+
+            <!-- 程式碼預覽器 -->
+            <div id="code-previewer" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">程式碼預覽器</h2>
+                <p class="text-gray-600 mb-6">即時預覽您的 HTML、CSS 與 JavaScript 程式碼。</p>
+                <div class="bg-white p-6 rounded-lg shadow flex flex-col md:flex-row h-[75vh]">
+                    <div class="flex-1 flex flex-col space-y-4 md:mr-4">
+                        <!-- HTML 編輯器 -->
+                        <div>
+                            <label for="htmlCode" class="block text-sm font-medium text-gray-700">HTML</label>
+                            <textarea id="htmlCode" class="w-full h-24 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="<!-- 輸入 HTML 程式碼... -->"></textarea>
+                            <div class="flex space-x-2 mt-2">
+                                <button class="copy-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="htmlCode">複製</button>
+                                <button class="paste-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="htmlCode">貼上</button>
+                                <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="htmlCode">清除</button>
+                            </div>
+                        </div>
+                        <!-- CSS 編輯器 -->
+                        <div>
+                            <label for="cssCode" class="block text-sm font-medium text-gray-700">CSS</label>
+                            <textarea id="cssCode" class="w-full h-24 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="/* 輸入 CSS 程式碼... */"></textarea>
+                            <div class="flex space-x-2 mt-2">
+                                <button class="copy-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="cssCode">複製</button>
+                                <button class="paste-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="cssCode">貼上</button>
+                                <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="cssCode">清除</button>
+                            </div>
+                        </div>
+                        <!-- JavaScript 編輯器 -->
+                        <div>
+                            <label for="jsCode" class="block text-sm font-medium text-gray-700">JavaScript</label>
+                            <textarea id="jsCode" class="w-full h-24 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="// 輸入 JavaScript 程式碼..."></textarea>
+                            <div class="flex space-x-2 mt-2">
+                                <button class="copy-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="jsCode">複製</button>
+                                <button class="paste-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="jsCode">貼上</button>
+                                <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="jsCode">清除</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 預覽區 -->
+                    <div class="flex-1 mt-4 md:mt-0 bg-gray-200 rounded-lg p-2">
+                        <iframe id="previewFrame" class="w-full h-full border-none bg-white"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF 轉圖片 -->
+            <div id="pdf-converter" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 轉圖片</h2>
+                <p class="text-gray-600 mb-6">將您的 PDF 檔案轉換為 JPG 或 PNG 格式。所有操作都在您的瀏覽器中完成。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFileConvert" accept=".pdf" multiple class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <div class="mt-4 flex space-x-4">
+                        <div class="flex-1">
+                            <label for="imageFormat" class="block text-sm font-medium text-gray-700">選擇圖片格式：</label>
+                            <select id="imageFormat" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="jpeg">JPG</option>
+                                <option value="png">PNG</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label for="imageDPI" class="block text-sm font-medium text-gray-700">自訂 DPI：</label>
+                            <input type="number" id="imageDPI" value="150" min="50" max="600" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                        </div>
+                    </div>
+                    <button id="convertPdfBtn" class="mt-6 w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200 disabled:bg-indigo-300">開始轉換</button>
+                    <div id="convertStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+
+            <!-- PDF 合併 -->
+            <div id="pdf-merger" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 合併</h2>
+                <p class="text-gray-600 mb-6">將多個 PDF 檔案合併成一個。請拖曳檔案來調整順序。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFilesMerge" multiple accept=".pdf" class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <ul id="fileList" class="mt-4 space-y-2"></ul>
+                    <button id="mergePdfBtn" class="mt-6 w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition duration-200 disabled:bg-green-300">開始合併</button>
+                    <div id="mergeStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+
+            <!-- PDF 分割 -->
+            <div id="pdf-splitter" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 分割</h2>
+                <p class="text-gray-600 mb-6">將一個 PDF 檔案分割成多個單獨的檔案。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFileSplit" accept=".pdf" class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <div class="mt-4">
+                        <label for="splitPages" class="block text-sm font-medium text-gray-700">指定分割頁碼（如：1,3,5-7）：</label>
+                        <input type="text" id="splitPages" placeholder="例: 1, 3, 5-7" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                    </div>
+                    <button id="splitPdfBtn" class="mt-6 w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition duration-200 disabled:bg-red-300">開始分割</button>
+                    
+                    <!-- 進階分割選項 -->
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-700">快速分割選項</h3>
+                        <p class="text-sm text-gray-500 mb-4">一鍵提取單數頁或雙數頁。</p>
+                        <div class="flex space-x-4">
+                            <button id="splitOddPagesBtn" class="flex-1 bg-red-400 text-white py-2 px-4 rounded-lg hover:bg-red-500 transition duration-200 disabled:bg-red-200">提取單數頁</button>
+                            <button id="splitEvenPagesBtn" class="flex-1 bg-red-400 text-white py-2 px-4 rounded-lg hover:bg-red-500 transition duration-200 disabled:bg-red-200">提取雙數頁</button>
+                        </div>
+                    </div>
+
+                    <div id="splitStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+
+            <!-- PDF 加密 -->
+            <div id="pdf-encryptor" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 加密</h2>
+                <p class="text-gray-600 mb-6">為 PDF 檔案設定密碼，保護您的文件。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFileEncrypt" accept=".pdf" class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <div class="mt-4">
+                        <label for="encryptPassword" class="block text-sm font-medium text-gray-700">設定密碼：</label>
+                        <input type="password" id="encryptPassword" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                    </div>
+                    <button id="encryptPdfBtn" class="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200">開始加密</button>
+                    <div id="encryptStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+
+            <!-- PDF 新增簽名 -->
+            <div id="pdf-signer" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 新增簽名</h2>
+                <p class="text-gray-600 mb-6">在畫布上簽名，並將其插入您的 PDF 文件。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFileSign" accept=".pdf" class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">繪製您的簽名：</label>
+                        <canvas id="signatureCanvas" class="w-full h-48 border border-gray-300 rounded-lg bg-gray-50"></canvas>
+                        <div class="flex space-x-2 mt-2">
+                             <button id="clearSignatureBtn" class="flex-1 bg-gray-400 text-white py-2 px-4 rounded-lg hover:bg-gray-500 transition duration-200">清除簽名</button>
+                        </div>
+                    </div>
+                    <button id="signPdfBtn" class="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200">插入簽名</button>
+                    <div id="signStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+            
+            <!-- PDF 新增文字 -->
+            <div id="pdf-add-text" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">PDF 新增文字</h2>
+                <p class="text-gray-600 mb-6">在 PDF 的指定位置新增文字內容。</p>
+                 <div class="bg-white p-6 rounded-lg shadow">
+                    <input type="file" id="pdfFileAddText" accept=".pdf" class="w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-violet-50 file:text-violet-700
+                                hover:file:bg-violet-100" />
+                    <div class="mt-4">
+                        <label for="textToAdd" class="block text-sm font-medium text-gray-700">要新增的文字：</label>
+                        <input type="text" id="textToAdd" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                    </div>
+                    <div class="flex space-x-4 mt-4">
+                        <div class="flex-1">
+                            <label for="addTextPage" class="block text-sm font-medium text-gray-700">頁碼：</label>
+                            <input type="number" id="addTextPage" value="1" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                        </div>
+                        <div class="flex-1">
+                            <label for="addTextX" class="block text-sm font-medium text-gray-700">X 座標：</label>
+                            <input type="number" id="addTextX" value="50" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                        </div>
+                        <div class="flex-1">
+                            <label for="addTextY" class="block text-sm font-medium text-gray-700">Y 座標：</label>
+                            <input type="number" id="addTextY" value="50" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+                        </div>
+                    </div>
+                    <button id="addTextPdfBtn" class="mt-6 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200">新增文字</button>
+                    <div id="addTextStatus" class="mt-4 text-center text-sm text-gray-500"></div>
+                </div>
+            </div>
+
+            <!-- 字碼查詢 -->
+            <div id="char-code" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">字碼查詢</h2>
+                <p class="text-gray-600 mb-6">查詢中文字或任何字元的 Unicode、Big5 編碼。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <textarea id="charInput" class="w-full h-24 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="輸入文字..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 transition rounded-lg text-sm" data-target="charInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 transition rounded-lg text-sm" data-target="charInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="charInput">清除</button>
+                    </div>
+                    <div id="charCodeOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                </div>
+            </div>
+
+            <!-- 正則表達式測試器 -->
+            <div id="regex-tester" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">正則表達式測試器</h2>
+                <p class="text-gray-600 mb-6">輸入正則表達式與測試文本，即時查看匹配結果。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <label for="regexPattern" class="block text-sm font-medium text-gray-700">正則表達式：</label>
+                    <input type="text" id="regexPattern" placeholder="/pattern/flags" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-cyan-500 hover:bg-cyan-600 transition rounded-lg text-sm" data-target="regexPattern">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-cyan-500 hover:bg-cyan-600 transition rounded-lg text-sm" data-target="regexPattern">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="regexPattern">清除</button>
+                    </div>
+                    <label for="regexText" class="block text-sm font-medium text-gray-700 mt-4">測試文本：</label>
+                    <textarea id="regexText" class="w-full h-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="輸入文本..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-cyan-500 hover:bg-cyan-600 transition rounded-lg text-sm" data-target="regexText">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-cyan-500 hover:bg-cyan-600 transition rounded-lg text-sm" data-target="regexText">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="regexText">清除</button>
+                    </div>
+                    <div id="regexOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                </div>
+            </div>
+            
+            <!-- 編碼/解碼器 -->
+            <div id="encoder-decoder" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">編碼/解碼器</h2>
+                <p class="text-gray-600 mb-6">支援 URL, Base64 和 HTML 實體的編碼與解碼。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <textarea id="encodeDecodeInput" class="w-full h-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="輸入要編碼/解碼的文字..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 transition rounded-lg text-sm" data-target="encodeDecodeInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 transition rounded-lg text-sm" data-target="encodeDecodeInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="encodeDecodeInput">清除</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <button class="encode-btn px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200" data-type="url">URL 編碼</button>
+                        <button class="decode-btn px-4 py-2 bg-blue-400 text-white rounded-lg hover:bg-blue-500 transition duration-200" data-type="url">URL 解碼</button>
+                        <button class="encode-btn px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200" data-type="base64">Base64 編碼</button>
+                        <button class="decode-btn px-4 py-2 bg-blue-400 text-white rounded-lg hover:bg-blue-500 transition duration-200" data-type="base64">Base64 解碼</button>
+                        <button class="encode-btn px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200" data-type="html">HTML 編碼</button>
+                        <button class="decode-btn px-4 py-2 bg-blue-400 text-white rounded-lg hover:bg-blue-500 transition duration-200" data-type="html">HTML 解碼</button>
+                    </div>
+                    <div id="encodeDecodeOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                </div>
+            </div>
+            
+            <!-- 網頁編輯 -->
+            <div id="web-editor" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">網頁編輯</h2>
+                <p class="text-gray-600 mb-6">啟用網頁的強制編輯模式、右鍵解鎖、複製表格和強制列印。</p>
+                <div class="bg-white p-6 rounded-lg shadow space-y-4">
+                    <button id="forceEditBtn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">啟用網頁強制編輯模式</button>
+                    <button id="unlockRightClickBtn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">啟用右鍵選單</button>
+                    <div class="flex space-x-4">
+                        <button id="copyAllTablesBtn" class="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">複製所有表格</button>
+                        <select id="tableFormat" class="flex-1 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option value="csv">CSV</option>
+                            <option value="markdown">Markdown</option>
+                        </select>
+                    </div>
+                    <button id="forcePrintBtn" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-200">強制列印</button>
+                    <div id="webEditorStatus" class="mt-4 text-center text-sm text-green-600"></div>
+                </div>
+            </div>
+
+            <!-- JSON 工具集 -->
+            <div id="json-tools" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">JSON 工具集</h2>
+                <p class="text-gray-600 mb-6">格式化、壓縮或以樹狀圖檢視您的 JSON 資料。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <textarea id="jsonInput" class="w-full h-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="貼上 JSON 文字..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="jsonInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-purple-500 hover:bg-purple-600 transition rounded-lg text-sm" data-target="jsonInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="jsonInput">清除</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <button id="formatJsonBtn" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-200">格式化</button>
+                        <button id="compressJsonBtn" class="flex-1 bg-purple-400 text-white py-2 px-4 rounded-lg hover:bg-purple-500 transition duration-200">壓縮</button>
+                        <button id="viewJsonTreeBtn" class="flex-1 bg-purple-400 text-white py-2 px-4 rounded-lg hover:bg-purple-500 transition duration-200">樹狀圖檢視</button>
+                        <button id="viewJsonTableBtn" class="flex-1 bg-purple-400 text-white py-2 px-4 rounded-lg hover:bg-purple-500 transition duration-200">轉為表格</button>
+                    </div>
+                    <div id="jsonOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                    <div id="jsonTreeOutput" class="mt-4 p-4 bg-gray-100 rounded-lg hidden"></div>
+                    <div id="jsonTableOutput" class="mt-4 p-4 bg-gray-100 rounded-lg hidden">
+                        <div id="tableHeaderControls" class="mb-4"></div>
+                        <div class="overflow-x-auto">
+                           <table id="jsonTable" class="min-w-full divide-y divide-gray-200"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 程式碼格式化 -->
+            <div id="code-formatter" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">程式碼格式化</h2>
+                <p class="text-gray-600 mb-6">支援多種程式語言的語法高亮與格式化。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex space-x-4 mb-4">
+                        <div class="flex-1">
+                            <label for="codeLang" class="block text-sm font-medium text-gray-700">選擇語言：</label>
+                            <select id="codeLang" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm rounded-md">
+                                <option value="sql">SQL</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="python">Python</option>
+                            </select>
+                        </div>
+                    </div>
+                    <textarea id="codeInput" class="w-full h-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="貼上程式碼..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-yellow-500 hover:bg-yellow-600 transition rounded-lg text-sm" data-target="codeInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-yellow-500 hover:bg-yellow-600 transition rounded-lg text-sm" data-target="codeInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="codeInput">清除</button>
+                    </div>
+                    <button id="formatCodeBtn" class="mt-4 w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition duration-200">格式化</button>
+                    <pre class="mt-4 p-4 bg-gray-800 text-white rounded-lg whitespace-pre-wrap text-sm overflow-x-auto"><code id="codeOutput" class="hljs"></code></pre>
+                </div>
+            </div>
+
+            <!-- 文本編輯與排序 -->
+            <div id="text-tools" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">文本編輯與排序</h2>
+                <p class="text-gray-600 mb-6">提供多種文字處理功能，包括大小寫轉換、排序與清理。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <textarea id="textInput" class="w-full h-48 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="貼上文字..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-pink-500 hover:bg-pink-600 transition rounded-lg text-sm" data-target="textInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-pink-500 hover:bg-pink-600 transition rounded-lg text-sm" data-target="textInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="textInput">清除</button>
+                    </div>
+                    <div class="mt-4">
+                        <label for="findText" class="block text-sm font-medium text-gray-700">尋找文字：</label>
+                        <input type="text" id="findText" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-300 focus:ring focus:ring-pink-200 focus:ring-opacity-50" />
+                    </div>
+                    <div class="mt-2">
+                        <label for="replaceText" class="block text-sm font-medium text-gray-700">取代為：</label>
+                        <input type="text" id="replaceText" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-pink-300 focus:ring focus:ring-pink-200 focus:ring-opacity-50" />
+                    </div>
+                    <button id="replaceAllBtn" class="mt-4 w-full bg-pink-500 text-white py-2 px-4 rounded-lg hover:bg-pink-600 transition duration-200">全部取代</button>
+
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <button id="toUpperBtn" class="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition duration-200">全大寫</button>
+                        <button id="toLowerBtn" class="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition duration-200">全小寫</button>
+                        <button id="toTitleCaseBtn" class="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition duration-200">詞首大寫</button>
+                        <button id="sortAscBtn" class="px-4 py-2 bg-pink-400 text-white rounded-lg hover:bg-pink-500 transition duration-200">升序排序</button>
+                        <button id="sortDescBtn" class="px-4 py-2 bg-pink-400 text-white rounded-lg hover:bg-pink-500 transition duration-200">降序排序</button>
+                        <button id="removeDuplicateBtn" class="px-4 py-2 bg-pink-400 text-white rounded-lg hover:bg-pink-500 transition duration-200">移除重複行</button>
+                        <button id="removeEmptyLinesBtn" class="px-4 py-2 bg-pink-400 text-white rounded-lg hover:bg-pink-500 transition duration-200">移除空白行</button>
+                    </div>
+                    
+                    <div id="textOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                </div>
+            </div>
+
+            <!-- 顏色工具 -->
+            <div id="color-tools" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">顏色工具</h2>
+                <p class="text-gray-600 mb-6">辨識顏色代碼並在不同格式間轉換。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <label for="colorInput" class="block text-sm font-medium text-gray-700">顏色輸入（#RRGGBB, rgb()等）：</label>
+                    <input type="text" id="colorInput" placeholder="#007bff" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-green-500 hover:bg-green-600 transition rounded-lg text-sm" data-target="colorInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-green-500 hover:bg-green-600 transition rounded-lg text-sm" data-target="colorInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="colorInput">清除</button>
+                    </div>
+                    <div id="colorPreview" class="w-16 h-16 mt-4 rounded-lg border border-gray-300 mx-auto"></div>
+                    <div id="colorOutput" class="mt-4 p-4 bg-gray-100 rounded-lg whitespace-pre-wrap text-sm"></div>
+                </div>
+            </div>
+
+            <!-- 台灣身分證產生器 -->
+            <div id="id-generator" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">台灣身分證產生器</h2>
+                <p class="text-gray-600 mb-6">產生符合規則的台灣身分證假資料，用於測試。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="idGender" class="block text-sm font-medium text-gray-700">性別：</label>
+                            <select id="idGender" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="1">男性</option>
+                                <option value="2">女性</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="idArea" class="block text-sm font-medium text-gray-700">地區：</label>
+                            <select id="idArea" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="A">臺北市</option><option value="B">臺中市</option><option value="C">基隆市</option><option value="D">臺南市</option><option value="E">高雄市</option><option value="F">新北市</option><option value="G">宜蘭縣</option><option value="H">桃園市</option><option value="I">嘉義市</option><option value="J">新竹縣</option><option value="K">苗栗縣</option><option value="L">臺中縣</option><option value="M">南投縣</option><option value="N">彰化縣</option><option value="O">新竹市</option><option value="P">雲林縣</option><option value="Q">嘉義縣</option><option value="R">臺南縣</option><option value="S">高雄縣</option><option value="T">屏東縣</option><option value="U">花蓮縣</option><option value="V">臺東縣</option><option value="W">金門縣</option><option value="X">澎湖縣</option><option value="Y">陽明山</option><option value="Z">連江縣</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="idCount" class="block text-sm font-medium text-gray-700">產生數量：</label>
+                            <input type="number" id="idCount" value="1" min="1" max="100" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-300 focus:ring focus:ring-teal-200 focus:ring-opacity-50" />
+                        </div>
+                    </div>
+                    <button id="generateIdBtn" class="mt-6 w-full bg-teal-600 text-white py-2 px-4 rounded-lg hover:bg-teal-700 transition duration-200">產生身分證號碼</button>
+                    <div id="idOutput" class="mt-4 p-4 bg-gray-100 rounded-lg text-sm font-mono whitespace-pre-wrap"></div>
+                    <div class="mt-6 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-700">身分證號碼驗證</h3>
+                        <p class="text-sm text-gray-500 mb-4">輸入身分證號碼來檢查是否有效。</p>
+                        <input type="text" id="idValidateInput" placeholder="輸入身分證號碼..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-300 focus:ring focus:ring-teal-200 focus:ring-opacity-50" />
+                        <button id="validateIdBtn" class="mt-4 w-full bg-teal-400 text-white py-2 px-4 rounded-lg hover:bg-teal-500 transition duration-200">驗證</button>
+                        <div id="idValidateStatus" class="mt-4 text-center text-sm"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 保險年齡計算 -->
+            <div id="age-calculator" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">保險年齡計算</h2>
+                <p class="text-gray-600 mb-6">根據出生年月日和投保日期，計算保險年齡。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="birthDate" class="block text-sm font-medium text-gray-700">出生年月日：</label>
+                            <input type="date" id="birthDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50" />
+                        </div>
+                        <div>
+                            <label for="policyDate" class="block text-sm font-medium text-gray-700">投保日期：</label>
+                            <input type="date" id="policyDate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50" />
+                        </div>
+                    </div>
+                    <button id="calculateAgeBtn" class="mt-6 w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition duration-200">計算</button>
+                    <div id="ageOutput" class="mt-4 p-4 bg-gray-100 rounded-lg text-sm"></div>
+                    <div id="ageExplanation" class="mt-4 p-4 bg-orange-50 rounded-lg hidden text-sm text-gray-600"></div>
+                </div>
+            </div>
+
+            <!-- QR Code 產生器 -->
+            <div id="qr-code-generator" class="tool-content hidden">
+                <h2 class="text-3xl font-bold mb-4">QR Code 產生器</h2>
+                <p class="text-gray-600 mb-6">將文字或網址轉換成 QR Code。</p>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <textarea id="qrInput" class="w-full h-24 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="輸入文字或網址..."></textarea>
+                    <div class="flex space-x-2 mt-2">
+                        <button class="copy-btn px-4 py-2 text-white bg-green-500 hover:bg-green-600 transition rounded-lg text-sm" data-target="qrInput">複製</button>
+                        <button class="paste-btn px-4 py-2 text-white bg-green-500 hover:bg-green-600 transition rounded-lg text-sm" data-target="qrInput">貼上</button>
+                        <button class="clear-btn px-4 py-2 text-white bg-red-500 hover:bg-red-600 transition rounded-lg text-sm" data-target="qrInput">清除</button>
+                    </div>
+                    <div class="mt-4 flex items-center space-x-4">
+                        <div class="flex-1">
+                            <label for="qrColor" class="block text-sm font-medium text-gray-700">顏色：</label>
+                            <input type="color" id="qrColor" value="#000000" class="mt-1 block w-full rounded-md" />
+                        </div>
+                        <div class="flex-1">
+                            <label for="qrBgColor" class="block text-sm font-medium text-gray-700">背景色：</label>
+                            <input type="color" id="qrBgColor" value="#ffffff" class="mt-1 block w-full rounded-md" />
+                        </div>
+                    </div>
+                    <button id="generateQrBtn" class="mt-4 w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition duration-200">產生 QR Code</button>
+                    <div class="mt-4 flex flex-col items-center">
+                        <canvas id="qrCanvas"></canvas>
+                        <a id="qrDownloadLink" class="mt-2 text-sm text-blue-600 hover:underline hidden" download>下載 QR Code</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 載入第三方函式庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        // 頁面載入完成後初始化
+        window.onload = function() {
+            // [FIX] 調整啟動順序，確保 UI 不會因外部資源載入失敗而卡住
+            
+            // 1. 立即處理 UI，隱藏載入畫面並顯示預設工具
+            const loading = document.getElementById('loading');
+            loading.style.display = 'none';
+            
+            const toolNav = document.getElementById('tool-nav');
+            let currentTool = 'code-previewer'; // 預設工具
+            document.getElementById(currentTool).style.display = 'block';
+            const activeButton = document.querySelector(`[data-target="${currentTool}"]`);
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
+            // 2. 安全地初始化可能失敗的外部函式庫
+            try {
+                // 檢查 pdfjsLib 是否存在，若存在才進行設定
+                if (typeof pdfjsLib !== 'undefined') {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                } else {
+                    // 如果函式庫不存在，拋出錯誤以便 catch 區塊處理
+                    throw new Error("pdf.js library not loaded.");
+                }
+            } catch (e) {
+                console.error("PDF.js 初始化失敗，PDF 相關功能將無法使用:", e);
+                // 停用所有 PDF 相關按鈕，並提供提示
+                document.querySelectorAll('[data-target^="pdf-"]').forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                    btn.title = 'PDF 功能因外部資源載入失敗而無法使用';
+                });
+            }
+            
+            // 3. 執行不會出錯的初始化程式碼
+            // 防止在預覽的 iframe 中重複執行主程式碼，避免無限迴圈
+            if (window.self !== window.top) {
+                return;
+            }
+            
+            // 導覽列點擊事件
+            toolNav.addEventListener('click', (e) => {
+                const button = e.target.closest('.nav-btn');
+                if (!button) return;
+
+                document.querySelectorAll('.tool-content').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+                const targetId = button.dataset.target;
+                document.getElementById(targetId).style.display = 'block';
+                button.classList.add('active');
+            });
+            
+            // 通用複製、貼上、清除功能
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        navigator.clipboard.writeText(targetElement.value).then(() => {
+                            const originalText = btn.textContent;
+                            btn.textContent = '已複製!';
+                            setTimeout(() => { btn.textContent = originalText; }, 1500);
+                        }).catch(err => {
+                            console.error('複製失敗: ', err);
+                        });
+                    }
+                });
+            });
+
+            document.querySelectorAll('.paste-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        const originalText = btn.textContent;
+                        btn.textContent = '請按 Ctrl+V';
+                        targetElement.focus();
+                        setTimeout(() => {
+                            btn.textContent = originalText;
+                        }, 2000);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.clear-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        targetElement.value = '';
+                        targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            });
+
+
+            // ===== 程式碼預覽器 =====
+            const htmlCodeInput = document.getElementById('htmlCode');
+            const cssCodeInput = document.getElementById('cssCode');
+            const jsCodeInput = document.getElementById('jsCode');
+            const previewFrame = document.getElementById('previewFrame');
+
+            function updatePreview() {
+                const html = htmlCodeInput.value;
+                const css = `<style>${cssCodeInput.value}</style>`;
+                const js = `<script>try { ${jsCodeInput.value} } catch(e) { console.error(e); }<\/script>`;
+                const content = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>${css}</head>
+                    <body>${html}${js}</body>
+                    </html>
+                `;
+                const doc = previewFrame.contentWindow.document;
+                doc.open();
+                doc.write(content);
+                doc.close();
+            }
+
+            htmlCodeInput.addEventListener('input', updatePreview);
+            cssCodeInput.addEventListener('input', updatePreview);
+            jsCodeInput.addEventListener('input', updatePreview);
+            updatePreview();
+
+
+            // ===== PDF 轉圖片 =====
+            async function convertPdfToImage(file, format, dpi, statusDiv) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const numPages = pdfDoc.numPages;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdfDoc.getPage(i);
+                        const viewport = page.getViewport({ scale: dpi / 72.0 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+                        const imageUrl = canvas.toDataURL(`image/${format}`);
+                        
+                        const link = document.createElement('a');
+                        link.href = imageUrl;
+                        link.download = `${file.name.replace('.pdf', '')}_page_${i}.${format}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                } catch (error) {
+                    console.error('PDF 轉換失敗:', error);
+                    throw new Error('轉換失敗，請檢查檔案格式。');
+                }
+            }
+            document.getElementById('convertPdfBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileConvert');
+                const files = fileInput.files;
+                const format = document.getElementById('imageFormat').value;
+                const dpi = parseInt(document.getElementById('imageDPI').value, 10);
+                const statusDiv = document.getElementById('convertStatus');
+
+                if (files.length === 0) {
+                    statusDiv.textContent = '請選擇一個或多個 PDF 檔案。';
+                    return;
+                }
+                if (isNaN(dpi) || dpi < 50 || dpi > 600) {
+                    statusDiv.textContent = '請輸入有效的 DPI 值 (50-600)。';
+                    return;
+                }
+
+                statusDiv.innerHTML = `轉換中 (0/${files.length})...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    try {
+                        await convertPdfToImage(file, format, dpi, statusDiv);
+                        statusDiv.innerHTML = `轉換中 (${i + 1}/${files.length})...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+                    } catch (error) {
+                        statusDiv.textContent = error.message;
+                        break;
+                    }
+                }
+                if (statusDiv.textContent.includes('轉換中')) {
+                     statusDiv.textContent = `所有檔案轉換完成！`;
+                }
+            });
+
+            // ===== PDF 合併 =====
+            const fileList = document.getElementById('fileList');
+            let mergeFiles = [];
+            document.getElementById('pdfFilesMerge').addEventListener('change', (e) => {
+                mergeFiles = Array.from(e.target.files);
+                renderMergeFileList();
+            });
+
+            function renderMergeFileList() {
+                fileList.innerHTML = '';
+                mergeFiles.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${index + 1}. ${file.name}`;
+                    li.className = 'bg-gray-100 p-2 rounded-md cursor-move draggable';
+                    li.draggable = true;
+                    li.dataset.index = index;
+                    fileList.appendChild(li);
+                });
+            }
+
+            fileList.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', e.target.dataset.index);
+            });
+            fileList.addEventListener('dragover', (e) => e.preventDefault());
+            fileList.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const toElement = e.target.closest('li');
+                if (!toElement) return;
+                const toIndex = parseInt(toElement.dataset.index, 10);
+
+                if (fromIndex !== toIndex) {
+                    const [movedItem] = mergeFiles.splice(fromIndex, 1);
+                    mergeFiles.splice(toIndex, 0, movedItem);
+                    renderMergeFileList();
+                }
+            });
+            document.getElementById('mergePdfBtn').addEventListener('click', async () => {
+                const statusDiv = document.getElementById('mergeStatus');
+                if (mergeFiles.length < 2) {
+                    statusDiv.textContent = '請選擇至少兩個 PDF 檔案。';
+                    return;
+                }
+                statusDiv.innerHTML = `合併中，請稍候...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+                try {
+                    const mergedPdf = await PDFLib.PDFDocument.create();
+                    for (const file of mergeFiles) {
+                        const pdfBytes = await file.arrayBuffer();
+                        const pdf = await PDFLib.PDFDocument.load(pdfBytes);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        copiedPages.forEach((page) => mergedPdf.addPage(page));
+                    }
+                    const mergedPdfBytes = await mergedPdf.save();
+                    const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'merged.pdf';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    statusDiv.textContent = '合併完成！檔案已下載。';
+                } catch (error) {
+                    console.error('PDF 合併失敗:', error);
+                    statusDiv.textContent = '合併失敗，請檢查檔案。';
+                }
+            });
+
+            // ===== PDF 分割 =====
+            async function splitPdf(file, pagesToExtract, statusDiv) {
+                if (!file) {
+                    statusDiv.textContent = '請選擇一個 PDF 檔案。';
+                    return;
+                }
+                if (pagesToExtract.length === 0) {
+                    statusDiv.textContent = '無效的頁碼範圍。';
+                    return;
+                }
+                statusDiv.innerHTML = `分割中，請稍候...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+                try {
+                    const pdfBytes = await file.arrayBuffer();
+                    const originalPdf = await PDFLib.PDFDocument.load(pdfBytes);
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    
+                    const copiedPages = await newPdf.copyPages(originalPdf, pagesToExtract.map(p => p - 1));
+                    copiedPages.forEach(page => newPdf.addPage(page));
+
+                    const newPdfBytes = await newPdf.save();
+                    const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${file.name.replace('.pdf', '')}_split.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    statusDiv.textContent = '分割完成！檔案已下載。';
+                } catch (error) {
+                    console.error('PDF 分割失敗:', error);
+                    statusDiv.textContent = '分割失敗，請檢查輸入或檔案。';
+                }
+            }
+            document.getElementById('splitPdfBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileSplit');
+                const file = fileInput.files[0];
+                const pagesInput = document.getElementById('splitPages').value;
+                const statusDiv = document.getElementById('splitStatus');
+                
+                if (!file) { statusDiv.textContent = '請選擇一個 PDF 檔案。'; return; }
+                if (!pagesInput) { statusDiv.textContent = '請指定要分割的頁碼。'; return; }
+
+                try {
+                    const pdfBytes = await file.arrayBuffer();
+                    const originalPdf = await PDFLib.PDFDocument.load(pdfBytes);
+                    const totalPages = originalPdf.getPageCount();
+                    const pagesToExtract = pagesInput.split(',').flatMap(range => {
+                        if (range.includes('-')) {
+                            const [start, end] = range.split('-').map(s => parseInt(s.trim(), 10));
+                            if (isNaN(start) || isNaN(end)) return [];
+                            return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+                        }
+                        const page = parseInt(range.trim(), 10);
+                        return isNaN(page) ? [] : [page];
+                    }).filter(page => page >= 1 && page <= totalPages);
+                    await splitPdf(file, pagesToExtract, statusDiv);
+                } catch (error) {
+                    console.error('PDF 分割失敗:', error);
+                    statusDiv.textContent = '分割失敗，請檢查輸入或檔案。';
+                }
+            });
+            document.getElementById('splitOddPagesBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileSplit');
+                const file = fileInput.files[0];
+                const statusDiv = document.getElementById('splitStatus');
+                if (!file) { statusDiv.textContent = '請選擇一個 PDF 檔案。'; return; }
+                const pdfBytes = await file.arrayBuffer();
+                const originalPdf = await PDFLib.PDFDocument.load(pdfBytes);
+                const totalPages = originalPdf.getPageCount();
+                const oddPages = Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p % 2 !== 0);
+                await splitPdf(file, oddPages, statusDiv);
+            });
+            document.getElementById('splitEvenPagesBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileSplit');
+                const file = fileInput.files[0];
+                const statusDiv = document.getElementById('splitStatus');
+                if (!file) { statusDiv.textContent = '請選擇一個 PDF 檔案。'; return; }
+                const pdfBytes = await file.arrayBuffer();
+                const originalPdf = await PDFLib.PDFDocument.load(pdfBytes);
+                const totalPages = originalPdf.getPageCount();
+                const evenPages = Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p % 2 === 0);
+                await splitPdf(file, evenPages, statusDiv);
+            });
+
+            // ===== PDF 加密 =====
+            document.getElementById('encryptPdfBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileEncrypt');
+                const file = fileInput.files[0];
+                const password = document.getElementById('encryptPassword').value;
+                const statusDiv = document.getElementById('encryptStatus');
+                if (!file) {
+                    statusDiv.textContent = '請選擇一個 PDF 檔案。';
+                    return;
+                }
+                if (!password) {
+                    statusDiv.textContent = '請輸入密碼。';
+                    return;
+                }
+                statusDiv.innerHTML = `加密中...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+
+                try {
+                    const pdfBytes = await file.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                    await pdfDoc.encrypt({
+                        ownerPassword: password,
+                        userPassword: password,
+                        permissions: {
+                            printing: 'highResolution',
+                            copying: true,
+                        }
+                    });
+                    const encryptedBytes = await pdfDoc.save();
+
+                    const blob = new Blob([encryptedBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${file.name.replace('.pdf', '')}_encrypted.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    statusDiv.textContent = '加密完成！檔案已下載。';
+                } catch (error) {
+                    console.error('PDF 加密失敗:', error);
+                    statusDiv.textContent = '加密失敗，請檢查檔案。';
+                }
+            });
+
+            // ===== PDF 新增簽名 =====
+            const signatureCanvas = document.getElementById('signatureCanvas');
+            const signatureCtx = signatureCanvas.getContext('2d');
+            let isDrawing = false;
+            
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                signatureCanvas.width = signatureCanvas.offsetWidth * ratio;
+                signatureCanvas.height = signatureCanvas.offsetHeight * ratio;
+                signatureCanvas.getContext('2d').scale(ratio, ratio);
+                signatureCtx.fillStyle = '#f9fafb'; // gray-50
+                signatureCtx.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+                signatureCtx.strokeStyle = 'black';
+                signatureCtx.lineWidth = 2;
+                signatureCtx.lineCap = 'round';
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            function startDrawing(e) { isDrawing = true; draw(e); }
+            function stopDrawing() { isDrawing = false; signatureCtx.beginPath(); }
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const rect = signatureCanvas.getBoundingClientRect();
+                const x = (e.clientX || e.touches[0].clientX) - rect.left;
+                const y = (e.clientY || e.touches[0].clientY) - rect.top;
+                signatureCtx.lineTo(x, y);
+                signatureCtx.stroke();
+                signatureCtx.beginPath();
+                signatureCtx.moveTo(x, y);
+            }
+            signatureCanvas.addEventListener('mousedown', startDrawing);
+            signatureCanvas.addEventListener('mouseup', stopDrawing);
+            signatureCanvas.addEventListener('mouseout', stopDrawing);
+            signatureCanvas.addEventListener('mousemove', draw);
+            signatureCanvas.addEventListener('touchstart', startDrawing);
+            signatureCanvas.addEventListener('touchend', stopDrawing);
+            signatureCanvas.addEventListener('touchcancel', stopDrawing);
+            signatureCanvas.addEventListener('touchmove', draw);
+            document.getElementById('clearSignatureBtn').addEventListener('click', () => {
+                signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+                signatureCtx.fillStyle = '#f9fafb'; // gray-50
+                signatureCtx.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+            });
+
+            document.getElementById('signPdfBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileSign');
+                const file = fileInput.files[0];
+                const statusDiv = document.getElementById('signStatus');
+                if (!file) { statusDiv.textContent = '請選擇一個 PDF 檔案。'; return; }
+
+                statusDiv.innerHTML = `插入簽名中...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+
+                try {
+                    const pdfBytes = await file.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                    const pages = pdfDoc.getPages();
+                    const firstPage = pages[0];
+                    const { width, height } = firstPage.getSize();
+                    
+                    const signatureDataUrl = signatureCanvas.toDataURL('image/png');
+                    const signatureImage = await pdfDoc.embedPng(signatureDataUrl);
+                    const signatureDims = signatureImage.scale(0.25);
+
+                    firstPage.drawImage(signatureImage, {
+                        x: width - signatureDims.width - 50,
+                        y: 50,
+                        width: signatureDims.width,
+                        height: signatureDims.height,
+                    });
+
+                    const signedPdfBytes = await pdfDoc.save();
+                    const blob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${file.name.replace('.pdf', '')}_signed.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    statusDiv.textContent = '簽名完成！檔案已下載。';
+
+                } catch (error) {
+                    console.error('PDF 簽名失敗:', error);
+                    statusDiv.textContent = '簽名失敗，請檢查檔案。';
+                }
+            });
+
+            // ===== PDF 新增文字 =====
+            document.getElementById('addTextPdfBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('pdfFileAddText');
+                const file = fileInput.files[0];
+                const textToAdd = document.getElementById('textToAdd').value;
+                const pageNum = parseInt(document.getElementById('addTextPage').value, 10);
+                const xCoord = parseInt(document.getElementById('addTextX').value, 10);
+                const yCoord = parseInt(document.getElementById('addTextY').value, 10);
+                const statusDiv = document.getElementById('addTextStatus');
+
+                if (!file || !textToAdd || isNaN(pageNum) || isNaN(xCoord) || isNaN(yCoord)) {
+                    statusDiv.textContent = '請確認所有欄位都已正確填寫。';
+                    return;
+                }
+                statusDiv.innerHTML = `新增文字中...<i class="fas fa-spinner fa-spin ml-2"></i>`;
+
+                try {
+                    const pdfBytes = await file.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                    const pages = pdfDoc.getPages();
+                    if(pageNum > pages.length || pageNum < 1) {
+                        statusDiv.textContent = `頁碼錯誤，此 PDF 只有 ${pages.length} 頁。`;
+                        return;
+                    }
+                    const page = pages[pageNum - 1];
+
+                    page.drawText(textToAdd, {
+                        x: xCoord,
+                        y: page.getHeight() - yCoord,
+                        size: 16,
+                        color: PDFLib.rgb(0, 0, 0)
+                    });
+
+                    const modifiedPdfBytes = await pdfDoc.save();
+                    const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${file.name.replace('.pdf', '')}_text.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    statusDiv.textContent = '新增文字完成！檔案已下載。';
+
+                } catch (error) {
+                    console.error('PDF 新增文字失敗:', error);
+                    statusDiv.textContent = '新增文字失敗，請檢查輸入或檔案。';
+                }
+            });
+
+
+            // ===== 字碼查詢 =====
+            document.getElementById('charInput').addEventListener('input', (e) => {
+                const text = e.target.value;
+                let output = '';
+                if (text.length > 0) {
+                    output = text.split('').map(char => {
+                        const unicode = char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0');
+                        const utf8Bytes = new TextEncoder().encode(char);
+                        const utf8Hex = Array.from(utf8Bytes).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+                        return `字元: ${char}\nUnicode: U+${unicode}\nUTF-8 (Hex): ${utf8Hex}`;
+                    }).join('\n\n');
+                }
+                document.getElementById('charCodeOutput').textContent = output.trim();
+            });
+
+            // ===== 正則表達式測試器 =====
+            function highlightRegexMatches(text, pattern, flags) {
+                try {
+                    const regex = new RegExp(pattern, flags);
+                    // 避免 XSS，將文字轉為純文本再插入
+                    const escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    return escapedText.replace(regex, '<span class="bg-yellow-300 text-black p-0.5 rounded">$&</span>');
+                } catch (e) {
+                    return `<span class="text-red-500">正則表達式錯誤: ${e.message}</span>`;
+                }
+            }
+
+            const regexTextarea = document.getElementById('regexText');
+            const regexPatternInput = document.getElementById('regexPattern');
+            const regexOutputDiv = document.getElementById('regexOutput');
+
+            function updateRegexOutput() {
+                const text = regexTextarea.value;
+                const patternInput = regexPatternInput.value;
+                
+                let regexPattern = patternInput;
+                let regexFlags = 'g';
+
+                const match = patternInput.match(/^\/(.*)\/([gimsuy]*)$/);
+                if (match) {
+                    regexPattern = match[1];
+                    regexFlags = match[2];
+                }
+
+                if(regexPattern === '') {
+                    regexOutputDiv.innerHTML = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    return;
+                }
+
+                const highlightedHtml = highlightRegexMatches(text, regexPattern, regexFlags);
+                regexOutputDiv.innerHTML = highlightedHtml;
+            }
+
+            regexTextarea.addEventListener('input', updateRegexOutput);
+            regexPatternInput.addEventListener('input', updateRegexOutput);
+
+            // ===== 編碼/解碼器 =====
+            const encodeDecodeInput = document.getElementById('encodeDecodeInput');
+            const encodeDecodeOutput = document.getElementById('encodeDecodeOutput');
+            document.querySelectorAll('.encode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const type = btn.dataset.type;
+                    const input = encodeDecodeInput.value;
+                    let output = '';
+                    try {
+                        switch (type) {
+                            case 'url':
+                                output = encodeURIComponent(input);
+                                break;
+                            case 'base64':
+                                output = btoa(unescape(encodeURIComponent(input))); // 處理 UTF-8
+                                break;
+                            case 'html':
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerText = input;
+                                output = tempDiv.innerHTML;
+                                break;
+                        }
+                        encodeDecodeOutput.textContent = output;
+                        encodeDecodeOutput.style.color = 'inherit';
+                    } catch (e) {
+                        encodeDecodeOutput.textContent = '編碼失敗：' + e.message;
+                        encodeDecodeOutput.style.color = '#ef4444';
+                    }
+                });
+            });
+            document.querySelectorAll('.decode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const type = btn.dataset.type;
+                    const input = encodeDecodeInput.value;
+                    let output = '';
+                    try {
+                        switch (type) {
+                            case 'url':
+                                output = decodeURIComponent(input);
+                                break;
+                            case 'base64':
+                                output = decodeURIComponent(escape(atob(input))); // 處理 UTF-8
+                                break;
+                            case 'html':
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = input;
+                                output = tempDiv.textContent || tempDiv.innerText || '';
+                                break;
+                        }
+                        encodeDecodeOutput.textContent = output;
+                        encodeDecodeOutput.style.color = 'inherit';
+                    } catch (e) {
+                        encodeDecodeOutput.textContent = '解碼失敗：' + e.message;
+                        encodeDecodeOutput.style.color = '#ef4444';
+                    }
+                });
+            });
+
+            // ===== 網頁編輯 =====
+            document.getElementById('forceEditBtn').addEventListener('click', () => {
+                document.body.contentEditable = document.body.contentEditable === 'true' ? 'false' : 'true';
+                document.designMode = document.designMode === 'on' ? 'off' : 'on';
+                document.getElementById('webEditorStatus').textContent = `強制編輯模式已${document.designMode === 'on' ? '啟用' : '關閉'}！`;
+            });
+            document.getElementById('unlockRightClickBtn').addEventListener('click', () => {
+                ['contextmenu', 'selectstart', 'dragstart'].forEach(event => {
+                    window.addEventListener(event, e => e.stopPropagation(), true);
+                });
+                document.getElementById('webEditorStatus').textContent = '已嘗試解鎖右鍵選單！';
+            });
+            document.getElementById('copyAllTablesBtn').addEventListener('click', () => {
+                const tables = document.querySelectorAll('table');
+                if (tables.length === 0) {
+                    document.getElementById('webEditorStatus').textContent = '未找到網頁中的表格。';
+                    return;
+                }
+                let output = [];
+                const format = document.getElementById('tableFormat').value;
+
+                tables.forEach((table, tableIndex) => {
+                    const rows = table.querySelectorAll('tr');
+                    let tableData = [];
+                    for (const row of rows) {
+                        const cols = row.querySelectorAll('td, th');
+                        const rowText = Array.from(cols).map(c => c.textContent.trim().replace(/"/g, '""'));
+                        tableData.push(rowText);
+                    }
+
+                    if (format === 'csv') {
+                        const csvString = tableData.map(row => `"${row.join('","')}"`).join('\n');
+                        output.push(`表格 ${tableIndex + 1}:\n${csvString}\n\n`);
+                    } else if (format === 'markdown') {
+                        if (tableData.length === 0) return;
+                        const headers = tableData[0];
+                        const markdownHeader = `| ${headers.join(' | ')} |`;
+                        const markdownSeparator = `|${'--- |'.repeat(headers.length)}`;
+                        const markdownRows = tableData.slice(1).map(row => `| ${row.join(' | ')} |`).join('\n');
+                        output.push(`表格 ${tableIndex + 1}:\n${markdownHeader}\n${markdownSeparator}\n${markdownRows}\n\n`);
+                    }
+                });
+
+                navigator.clipboard.writeText(output.join(''));
+                document.getElementById('webEditorStatus').textContent = `已複製所有表格（${format.toUpperCase()} 格式）到剪貼簿。`;
+            });
+            document.getElementById('forcePrintBtn').addEventListener('click', () => {
+                window.print();
+            });
+            
+            // ===== JSON 工具集 =====
+            let jsonTableData = [];
+            let jsonTableHeaders = [];
+            let draggedColumn = null;
+
+            function flattenJson(obj, parentKey = '', result = {}) {
+                for (let key in obj) {
+                    if (!obj.hasOwnProperty(key)) continue;
+                    let newKey = parentKey ? `${parentKey}.${key}` : key;
+                    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+                        flattenJson(obj[key], newKey, result);
+                    } else {
+                        result[newKey] = obj[key];
+                    }
+                }
+                return result;
+            }
+
+            function renderJsonTable(headers, data) {
+                const table = document.getElementById('jsonTable');
+                table.innerHTML = '';
+                const thead = table.createTHead();
+                const headerRow = thead.insertRow();
+                
+                headers.forEach((headerText) => {
+                    const th = document.createElement('th');
+                    th.textContent = headerText;
+                    th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 draggable';
+                    th.draggable = true;
+                    headerRow.appendChild(th);
+                });
+
+                const tbody = document.createElement('tbody');
+                tbody.className = 'bg-white divide-y divide-gray-200';
+                
+                data.forEach(item => {
+                    const row = tbody.insertRow();
+                    headers.forEach(header => {
+                        const cell = row.insertCell();
+                        let value = item[header];
+                        cell.textContent = (value === null || value === undefined) ? '' : String(value);
+                        cell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900';
+                    });
+                });
+                table.appendChild(tbody);
+                
+                // Add drag and drop listeners for column reordering
+                const headerCells = document.querySelectorAll('#jsonTable thead th');
+                headerCells.forEach(th => {
+                    th.addEventListener('dragstart', (e) => {
+                        draggedColumn = th;
+                        e.dataTransfer.effectAllowed = 'move';
+                    });
+                    th.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+                    th.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        if (draggedColumn !== th) {
+                            const headerTexts = Array.from(document.querySelectorAll('#jsonTable thead th')).map(h => h.textContent);
+                            const fromIndex = headerTexts.indexOf(draggedColumn.textContent);
+                            const toIndex = headerTexts.indexOf(th.textContent);
+                            
+                            const [removed] = jsonTableHeaders.splice(fromIndex, 1);
+                            jsonTableHeaders.splice(toIndex, 0, removed);
+                            
+                            renderJsonTable(jsonTableHeaders, jsonTableData);
+                        }
+                    });
+                });
+            }
+
+            document.getElementById('formatJsonBtn').addEventListener('click', () => {
+                const input = document.getElementById('jsonInput').value;
+                const outputDiv = document.getElementById('jsonOutput');
+                try {
+                    const obj = JSON.parse(input);
+                    outputDiv.textContent = JSON.stringify(obj, null, 2);
+                    outputDiv.style.color = 'inherit';
+                    outputDiv.classList.remove('hidden');
+                    document.getElementById('jsonTreeOutput').classList.add('hidden');
+                    document.getElementById('jsonTableOutput').classList.add('hidden');
+                } catch (e) {
+                    outputDiv.textContent = 'JSON 格式錯誤：' + e.message;
+                    outputDiv.style.color = '#ef4444'; // red-500
+                    outputDiv.classList.remove('hidden');
+                    document.getElementById('jsonTreeOutput').classList.add('hidden');
+                    document.getElementById('jsonTableOutput').classList.add('hidden');
+                }
+            });
+            document.getElementById('compressJsonBtn').addEventListener('click', () => {
+                const input = document.getElementById('jsonInput').value;
+                const outputDiv = document.getElementById('jsonOutput');
+                try {
+                    const obj = JSON.parse(input);
+                    outputDiv.textContent = JSON.stringify(obj);
+                    outputDiv.style.color = 'inherit';
+                    outputDiv.classList.remove('hidden');
+                    document.getElementById('jsonTreeOutput').classList.add('hidden');
+                    document.getElementById('jsonTableOutput').classList.add('hidden');
+                } catch (e) {
+                    outputDiv.textContent = 'JSON 格式錯誤：' + e.message;
+                    outputDiv.style.color = '#ef4444'; // red-500
+                    outputDiv.classList.remove('hidden');
+                    document.getElementById('jsonTreeOutput').classList.add('hidden');
+                    document.getElementById('jsonTableOutput').classList.add('hidden');
+                }
+            });
+            function buildJsonTree(obj, container) {
+                container.innerHTML = '';
+                function createNode(key, value) {
+                    const li = document.createElement('li');
+                    li.className = 'text-sm';
+                    if (typeof value === 'object' && value !== null) {
+                        const isArray = Array.isArray(value);
+                        const keys = Object.keys(value);
+                        li.innerHTML = `<span class="toggle-btn cursor-pointer font-bold mr-1 fas fa-caret-down"></span><span class="text-gray-600">${key}: </span><span class="text-blue-500">${isArray ? `[${keys.length}]` : `{${keys.length}}`}</span>`;
+                        const ul = document.createElement('ul');
+                        ul.className = 'ml-4 border-l-2 border-gray-200 pl-2';
+                        keys.forEach(childKey => ul.appendChild(createNode(childKey, value[childKey])));
+                        li.appendChild(ul);
+                        li.querySelector('.toggle-btn').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            ul.classList.toggle('hidden');
+                            e.target.classList.toggle('fa-caret-down');
+                            e.target.classList.toggle('fa-caret-right');
+                        });
+                    } else {
+                        li.innerHTML = `<span class="text-gray-600">${key}: </span><span class="text-green-600">${JSON.stringify(value)}</span>`;
+                    }
+                    return li;
+                }
+                const rootUl = document.createElement('ul');
+                for (const key in obj) {
+                    rootUl.appendChild(createNode(key, obj[key]));
+                }
+                container.appendChild(rootUl);
+            }
+            document.getElementById('viewJsonTreeBtn').addEventListener('click', () => {
+                const input = document.getElementById('jsonInput').value;
+                const outputDiv = document.getElementById('jsonOutput');
+                const treeDiv = document.getElementById('jsonTreeOutput');
+                const tableDiv = document.getElementById('jsonTableOutput');
+                try {
+                    const obj = JSON.parse(input);
+                    buildJsonTree(obj, treeDiv);
+                    outputDiv.classList.add('hidden');
+                    treeDiv.classList.remove('hidden');
+                    tableDiv.classList.add('hidden');
+                } catch (e) {
+                    outputDiv.textContent = 'JSON 格式錯誤：' + e.message;
+                    outputDiv.style.color = '#ef4444';
+                    outputDiv.classList.remove('hidden');
+                    treeDiv.classList.add('hidden');
+                    tableDiv.classList.add('hidden');
+                }
+            });
+
+            document.getElementById('viewJsonTableBtn').addEventListener('click', () => {
+                const input = document.getElementById('jsonInput').value;
+                const outputDiv = document.getElementById('jsonOutput');
+                const treeDiv = document.getElementById('jsonTreeOutput');
+                const tableDiv = document.getElementById('jsonTableOutput');
+                try {
+                    const obj = JSON.parse(input);
+                    let data = Array.isArray(obj) ? obj.map(item => flattenJson(item)) : [flattenJson(obj)];
+                    
+                    jsonTableData = data;
+                    jsonTableHeaders = [...new Set(data.flatMap(item => Object.keys(item)))];
+                    
+                    renderJsonTable(jsonTableHeaders, jsonTableData);
+                    
+                    outputDiv.classList.add('hidden');
+                    treeDiv.classList.add('hidden');
+                    tableDiv.classList.remove('hidden');
+                } catch (e) {
+                    outputDiv.textContent = 'JSON 格式錯誤或不適用於表格：' + e.message;
+                    outputDiv.style.color = '#ef4444';
+                    outputDiv.classList.remove('hidden');
+                    treeDiv.classList.add('hidden');
+                    tableDiv.classList.add('hidden');
+                }
+            });
+
+
+            // ===== 程式碼格式化 =====
+            const codeInput = document.getElementById('codeInput');
+            const codeOutput = document.getElementById('codeOutput');
+            const codeLang = document.getElementById('codeLang');
+
+            document.getElementById('formatCodeBtn').addEventListener('click', () => {
+                const code = codeInput.value;
+                const lang = codeLang.value;
+                codeOutput.textContent = code;
+                codeOutput.className = `hljs language-${lang}`;
+                hljs.highlightElement(codeOutput);
+            });
+            
+            // ===== 文本編輯與排序 =====
+            const textInput = document.getElementById('textInput');
+            const textOutput = document.getElementById('textOutput');
+            const findTextInput = document.getElementById('findText');
+            const replaceTextInput = document.getElementById('replaceText');
+
+            function updateTextOutput(newText) {
+                textInput.value = newText;
+                textOutput.textContent = newText;
+            }
+
+            document.getElementById('replaceAllBtn').addEventListener('click', () => {
+                const findText = findTextInput.value;
+                const replaceText = replaceTextInput.value;
+                if(findText === '') return;
+                const regex = new RegExp(findText, 'g');
+                updateTextOutput(textInput.value.replace(regex, replaceText));
+            });
+
+            document.getElementById('toUpperBtn').addEventListener('click', () => updateTextOutput(textInput.value.toUpperCase()));
+            document.getElementById('toLowerBtn').addEventListener('click', () => updateTextOutput(textInput.value.toLowerCase()));
+            document.getElementById('toTitleCaseBtn').addEventListener('click', () => {
+                const converted = textInput.value.toLowerCase().replace(/(^|\s)\S/g, L => L.toUpperCase());
+                updateTextOutput(converted);
+            });
+            document.getElementById('sortAscBtn').addEventListener('click', () => {
+                const lines = textInput.value.split('\n').sort((a, b) => a.localeCompare(b)).join('\n');
+                updateTextOutput(lines);
+            });
+            document.getElementById('sortDescBtn').addEventListener('click', () => {
+                const lines = textInput.value.split('\n').sort((a, b) => b.localeCompare(a)).join('\n');
+                updateTextOutput(lines);
+            });
+            document.getElementById('removeDuplicateBtn').addEventListener('click', () => {
+                const lines = textInput.value.split('\n');
+                const uniqueLines = [...new Set(lines)];
+                updateTextOutput(uniqueLines.join('\n'));
+            });
+            document.getElementById('removeEmptyLinesBtn').addEventListener('click', () => {
+                const lines = textInput.value.split('\n').filter(line => line.trim() !== '');
+                updateTextOutput(lines.join('\n'));
+            });
+            
+            // ===== 顏色工具 =====
+            const colorInput = document.getElementById('colorInput');
+            const colorPreview = document.getElementById('colorPreview');
+            const colorOutput = document.getElementById('colorOutput');
+
+            function toRgb(hex) {
+                let c = hex.substring(1).split('');
+                if(c.length === 3) { c = [c[0], c[0], c[1], c[1], c[2], c[2]]; }
+                c = '0x' + c.join('');
+                return `rgb(${(c>>16)&255}, ${(c>>8)&255}, ${c&255})`;
+            }
+
+            function toHex(rgb) {
+                let [r, g, b] = rgb.match(/\d+/g).map(Number);
+                return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+            }
+
+            colorInput.addEventListener('input', (e) => {
+                const color = e.target.value.trim();
+                colorPreview.style.backgroundColor = 'transparent';
+                try {
+                    colorPreview.style.backgroundColor = color;
+                    let output = `輸入: ${color}\n`;
+                    if (color.startsWith('#')) {
+                        output += `RGB: ${toRgb(color)}\n`;
+                    } else if (color.startsWith('rgb')) {
+                        output += `Hex: ${toHex(color)}\n`;
+                    }
+                    colorOutput.textContent = output;
+                } catch (err) {
+                    colorOutput.textContent = '無效的顏色代碼';
+                }
+            });
+
+            // ===== 台灣身分證產生器 =====
+            function generateTaiwanId(areaCode, gender) {
+                const areas = {
+                    'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15, 'G': 16, 'H': 17, 'I': 34,
+                    'J': 18, 'K': 19, 'M': 21, 'N': 22, 'O': 35, 'P': 23, 'Q': 24, 'R': 25, 'S': 26, 
+                    'T': 27, 'U': 28, 'V': 29, 'W': 32, 'X': 30, 'Y': 31, 'Z': 33, 'L':20,
+                };
+                const areaVal = areas[areaCode];
+                let id = areaCode + gender;
+                for (let i = 0; i < 7; i++) {
+                    id += Math.floor(Math.random() * 10);
+                }
+                let sum = Math.floor(areaVal / 10) + (areaVal % 10) * 9;
+                for (let i = 1; i < 9; i++) {
+                    sum += parseInt(id.charAt(i)) * (9 - i);
+                }
+                const checkDigit = (10 - (sum % 10)) % 10;
+                id += checkDigit;
+                return id;
+            }
+            function validateTaiwanId(id) {
+                id = id.toUpperCase();
+                const regex = /^[A-Z][12]\d{8}$/;
+                if (!regex.test(id)) return false;
+
+                const areas = {
+                    'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15, 'G': 16, 'H': 17, 'I': 34,
+                    'J': 18, 'K': 19, 'M': 21, 'N': 22, 'O': 35, 'P': 23, 'Q': 24, 'R': 25, 'S': 26, 
+                    'T': 27, 'U': 28, 'V': 29, 'W': 32, 'X': 30, 'Y': 31, 'Z': 33, 'L':20,
+                };
+                const areaVal = areas[id.charAt(0)];
+                if (!areaVal) return false;
+
+                let sum = Math.floor(areaVal / 10) + (areaVal % 10) * 9;
+                for (let i = 1; i < 9; i++) {
+                    sum += parseInt(id.charAt(i)) * (9 - i);
+                }
+                const checkDigit = (10 - (sum % 10)) % 10;
+                return checkDigit === parseInt(id.charAt(9));
+            }
+            document.getElementById('generateIdBtn').addEventListener('click', () => {
+                const areaCode = document.getElementById('idArea').value;
+                const gender = document.getElementById('idGender').value;
+                const count = parseInt(document.getElementById('idCount').value, 10) || 1;
+                let output = '';
+                for (let i = 0; i < count; i++) {
+                    output += generateTaiwanId(areaCode, gender) + '\n';
+                }
+                document.getElementById('idOutput').textContent = output.trim();
+            });
+            document.getElementById('validateIdBtn').addEventListener('click', () => {
+                const input = document.getElementById('idValidateInput').value;
+                const statusDiv = document.getElementById('idValidateStatus');
+                if (validateTaiwanId(input)) {
+                    statusDiv.textContent = '身分證號碼有效！';
+                    statusDiv.style.color = '#10b981'; // green-500
+                } else {
+                    statusDiv.textContent = '身分證號碼無效。';
+                    statusDiv.style.color = '#ef4444'; // red-500
+                }
+            });
+
+            // ===== 保險年齡計算 =====
+            document.getElementById('calculateAgeBtn').addEventListener('click', () => {
+                const birthDateStr = document.getElementById('birthDate').value;
+                const policyDateStr = document.getElementById('policyDate').value;
+                const outputDiv = document.getElementById('ageOutput');
+                const explanationDiv = document.getElementById('ageExplanation');
+
+                if (!birthDateStr || !policyDateStr) {
+                    outputDiv.textContent = '請輸入出生年月日和投保日期。';
+                    explanationDiv.classList.add('hidden');
+                    return;
+                }
+
+                const birthDate = new Date(birthDateStr);
+                const policyDate = new Date(policyDateStr);
+
+                let age = policyDate.getFullYear() - birthDate.getFullYear();
+                const m = policyDate.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && policyDate.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+
+                const policyPlus6Months = new Date(policyDate);
+                policyPlus6Months.setMonth(policyPlus6Months.getMonth() - 6);
+
+                let insuranceAge = policyDate.getFullYear() - birthDate.getFullYear();
+                if (policyDate.getMonth() < birthDate.getMonth() || 
+                   (policyDate.getMonth() === birthDate.getMonth() && policyDate.getDate() < birthDate.getDate())) {
+                    insuranceAge--;
+                }
+                
+                const nextBirthday = new Date(policyDate.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+                if(policyDate > nextBirthday) {
+                    nextBirthday.setFullYear(nextBirthday.getFullYear() + 1);
+                }
+                const sixMonthsBeforeNextBirthday = new Date(nextBirthday);
+                sixMonthsBeforeNextBirthday.setMonth(sixMonthsBeforeNextBirthday.getMonth() - 6);
+
+                if(policyDate >= sixMonthsBeforeNextBirthday) {
+                    insuranceAge++;
+                }
+                
+                outputDiv.innerHTML = `
+                    <p>實際足歲：${age} 歲</p>
+                    <p class="text-lg font-bold">保險年齡：${insuranceAge} 歲</p>
+                `;
+                explanationDiv.innerHTML = `
+                    <p><strong>計算說明：</strong></p>
+                    <p>保險年齡以「足歲」為基礎，但若投保日距離下一個生日「不超過六個月」，則會加計一歲。</p>
+                    <p>例如：1月1日生，若在當年7月1日(含)之後投保，保險年齡就會比足歲多一歲。</p>
+                `;
+                explanationDiv.classList.remove('hidden');
+            });
+
+            // ===== QR Code 產生器 =====
+            let qrCodeInstance = null;
+            document.getElementById('generateQrBtn').addEventListener('click', () => {
+                const input = document.getElementById('qrInput').value;
+                const color = document.getElementById('qrColor').value;
+                const bgColor = document.getElementById('qrBgColor').value;
+                const canvasContainer = document.getElementById('qrCanvas');
+                const downloadLink = document.getElementById('qrDownloadLink');
+
+                if (!input) return;
+
+                canvasContainer.innerHTML = '';
+                canvasContainer.style.display = 'block';
+
+                qrCodeInstance = new QRCode(canvasContainer, {
+                    text: input,
+                    width: 256,
+                    height: 256,
+                    colorDark: color,
+                    colorLight: bgColor,
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                setTimeout(() => { // 讓 canvas 完成繪製
+                    const canvasElement = canvasContainer.querySelector('canvas');
+                    if (canvasElement) {
+                        downloadLink.href = canvasElement.toDataURL('image/png');
+                        downloadLink.style.display = 'block';
+                    }
+                }, 100);
+            });
+        };
+    </script>
+</body>
+</html>
